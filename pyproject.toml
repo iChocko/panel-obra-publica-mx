@@ -31,8 +31,10 @@ build-backend = "hatchling.build"
 packages = ["src/opa"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py312"
+# Documentos de especificación: no son código del proyecto, no se tocan.
+extend-exclude = ["ARQUITECTURA-panel-obra-publica-mx.md", "viabilidad_tecnica"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

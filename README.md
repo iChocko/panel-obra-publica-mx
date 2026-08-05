@@ -24,7 +24,9 @@ real medida y la recomendación resultante de la puerta de decisión._
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
 
 ```bash
-uv sync
+# --no-editable evita un problema de instalación editable observado en algunos
+# entornos sandbox (el .pth no se procesa); funciona igual en una máquina normal.
+uv sync --no-editable
 
 # Descubrimiento: prueba ~280 URLs candidatas contra la SHCP (a 1 req/2s, ≈10 min),
 # consulta el mirror CKAN de datos.gob.mx y la CDX API del Wayback Machine.
