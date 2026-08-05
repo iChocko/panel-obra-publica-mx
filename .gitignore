@@ -1,0 +1,17 @@
+# Entornos y cachés de Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Datos: todo lo pesado queda fuera de git salvo las muestras de Fase 0
+data/*
+!data/muestras/
+
+# Config local de Claude Code
+.claude/settings.local.json
+
+# SO
+.DS_Store

@@ -1,0 +1,41 @@
+[project]
+name = "panel-obra-publica-mx"
+version = "0.1.0"
+description = "Panel histórico trimestral de Programas y Proyectos de Inversión (PPI) federales de México, reconstruido a partir de Obra Pública Abierta (OPA) de la SHCP."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "pyarrow>=17.0",
+    "openpyxl>=3.1",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+opa = "opa.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opa"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
