@@ -1,0 +1,61 @@
+# Patrones de URL y parámetros de red para el descubrimiento de datos abiertos
+# de Obra Pública Abierta (OPA), SHCP. Fase 0 — reconocimiento.
+#
+# Ver viabilidad_tecnica y ARQUITECTURA-panel-obra-publica-mx.md para el contexto completo.
+
+red:
+  # Transparencia, no evasión: identificable, con propósito y contacto.
+  user_agent: "panel-obra-publica-mx/0.1 (investigacion de datos abiertos; github.com/iChocko)"
+  rate_limit_segundos_shcp: 2.0
+  max_reintentos: 3
+  backoff_base_segundos: 1.0
+  timeout_segundos: 20.0
+  # Usado como fallback cuando HEAD no responde bien (ver discovery.py).
+  head_range_bytes: "bytes=0-2047"
+  bytes_maximos_get_range: 2048
+
+anios:
+  desde: 2015
+  hasta: 2026
+
+# --- Fuente 1: URLs vivas ------------------------------------------------
+fuente_viva:
+  base_url: "https://www.transparenciapresupuestaria.gob.mx"
+  # Placeholders soportados: {anio}, {n} (1..4), {ord} (1er..4to), {v} (2,3).
+  patrones:
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/proyectos_opa.csv"
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/proyectos_opa.xlsx"
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/proyectos_opa_0{n}t{anio}.csv"
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/proyectos_opa_0{n}t{anio}.xlsx"
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/reporteOPA{ord}Trimestre.xlsx"
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/reporteOPA{ord}Trimestre_V{v}.xlsx"
+    - "/work/models/PTP/OPA/{anio}/Proyectos_OPA.csv"  # patrón antiguo
+  trimestre_n: [1, 2, 3, 4]
+  trimestre_ord: ["1er", "2do", "3er", "4to"]
+  version_v: [2, 3]
+  # Se descargan completos si responden 200 (excepción explícita a "solo metadatos").
+  auxiliares:
+    - "/work/models/PTP/DatosAbiertos/Diccionarios/diccionario_opa.xlsx"
+    - "/work/models/PTP/DatosAbiertos/Metadatos/catalogos.xlsx"
+    - "/work/models/PTP/OPA/app.xlsx"
+
+# --- Fuente 2: espejos ----------------------------------------------------
+fuente_espejo:
+  ckan_base: "https://www.datos.gob.mx/api/3/action"
+  # id histórico documentado en el dictamen de viabilidad (a confirmar: puede
+  # ya no existir en el catálogo actual — ver discovery.jsonl).
+  ckan_package_id: "56b98e14-41ba-4edd-b8a8-c96d5008b071"
+  ckan_busqueda_respaldo: "Obra Pública Abierta"
+  datamx_io: "https://datamx.io"
+
+# --- Fuente 3: Wayback Machine (CDX API) -----------------------------------
+fuente_wayback:
+  cdx_base: "http://web.archive.org/cdx/search/cdx"
+  prefijos:
+    - "transparenciapresupuestaria.gob.mx/work/models/PTP/DatosAbiertos/OPA"
+    - "transparenciapresupuestaria.gob.mx/work/models/PTP/OPA"
+  match_type: "prefix"
+  collapse: "digest"
+  campos: ["original", "timestamp", "statuscode", "mimetype", "length", "digest"]
+  filtro_status: "statuscode:200"
+  filtro_mimetype_excluir: "!mimetype:text/html"
