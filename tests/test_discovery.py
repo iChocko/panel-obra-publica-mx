@@ -11,6 +11,7 @@ from opa.discovery import (
     _es_error_de_conexion,
     _llamar_con_reintentos,
     _parsear_respuesta_curl,
+    _racha_final_hueca,
     calcular_recuperabilidad,
     cargar_resultados,
     clasificar_captura,
@@ -26,7 +27,7 @@ CFG_MINIMA = {
     "fuente_viva": {
         "base_url": "https://example.mx",
         "patrones": [
-            "/OPA/{anio}/proyectos_opa.csv",
+            "/DatosAbiertos/OPA/{anio}/proyectos_opa.csv",
             "/OPA/{anio}/proyectos_opa_0{n}t{anio}.csv",
             "/OPA/{anio}/reporteOPA{ord}Trimestre.xlsx",
             "/OPA/{anio}/reporteOPA{ord}Trimestre_V{v}.xlsx",
@@ -60,6 +61,19 @@ def test_generar_urls_vivas_auxiliar_sin_anio_ni_trimestre() -> None:
     assert auxiliares[0][1] is None
     assert auxiliares[0][2] is None
     assert auxiliares[0][0] == "https://example.mx/aux/diccionario_opa.xlsx"
+
+
+def test_generar_urls_vivas_usa_mismo_vocabulario_de_patron_que_clasificar_captura() -> None:
+    """Regresión: 'vivo' debe etiquetar con las mismas etiquetas semánticas que clasificar_captura
+    usa para 'wayback' -- si no, construir_cobertura_anual_generica no reconoce los hits vivos
+    del patrón genérico (bug real: 2019-2021 aparecían como hueco pese a existir)."""
+    urls = list(generar_urls_vivas(CFG_MINIMA))
+    anuales = {u[3] for u in urls if "proyectos_opa.csv" in u[0]}
+    assert anuales == {"anual_generico"}
+    trimestrales_num = {u[3] for u in urls if "proyectos_opa_0" in u[0]}
+    assert trimestrales_num == {"trimestral_numerico"}
+    trimestrales_ord = {u[3] for u in urls if "reporteOPA" in u[0]}
+    assert trimestrales_ord == {"trimestral_ordinal"}
 
 
 def test_clasificar_captura_trimestral_numerico() -> None:
@@ -260,3 +274,13 @@ def test_llamar_con_reintentos_si_reintenta_error_transitorio() -> None:
     assert resultado == "ok"
     assert intentos == 3
     assert error is None
+
+
+def test_racha_final_hueca_detecta_huecos_al_final_del_rango() -> None:
+    anual = {2020: "vivo", 2021: "vivo", 2022: "hueco", 2023: "hueco", 2024: "hueco"}
+    assert _racha_final_hueca(anual, 2020, 2024) == 3
+
+
+def test_racha_final_hueca_cero_si_el_ultimo_anio_tiene_datos() -> None:
+    anual = {2020: "hueco", 2021: "vivo", 2022: "hueco", 2023: "hueco", 2024: "vivo"}
+    assert _racha_final_hueca(anual, 2020, 2024) == 0

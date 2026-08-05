@@ -254,7 +254,7 @@ def generar_urls_vivas(
         for patron in fv["patrones"]:
             if "{n}" in patron:
                 for n in fv["trimestre_n"]:
-                    yield base + patron.format(anio=anio, n=n), anio, n, patron
+                    yield base + patron.format(anio=anio, n=n), anio, n, "trimestral_numerico"
             elif "{ord}" in patron and "{v}" in patron:
                 for ord_ in fv["trimestre_ord"]:
                     for v in fv["version_v"]:
@@ -262,7 +262,7 @@ def generar_urls_vivas(
                             base + patron.format(anio=anio, ord=ord_, v=v),
                             anio,
                             ORD_A_TRIMESTRE[ord_],
-                            patron,
+                            "trimestral_ordinal",
                         )
             elif "{ord}" in patron:
                 for ord_ in fv["trimestre_ord"]:
@@ -270,10 +270,13 @@ def generar_urls_vivas(
                         base + patron.format(anio=anio, ord=ord_),
                         anio,
                         ORD_A_TRIMESTRE[ord_],
-                        patron,
+                        "trimestral_ordinal",
                     )
             else:
-                yield base + patron.format(anio=anio), anio, None, patron
+                # Mismo vocabulario que clasificar_captura(), para que "vivo" y "wayback"
+                # sean comparables: el patrón nuevo vive bajo DatosAbiertos/, el antiguo no.
+                etiqueta = "anual_generico" if "DatosAbiertos" in patron else "anual_generico_antiguo"
+                yield base + patron.format(anio=anio), anio, None, etiqueta
 
     for aux in fv["auxiliares"]:
         yield base + aux, None, None, "auxiliar"
@@ -804,6 +807,16 @@ def recomendar(porcentaje: float) -> str:
     )
 
 
+def _racha_final_hueca(anual: dict[int, str], anio_desde: int, anio_hasta: int) -> int:
+    """Cuenta los años consecutivos con hueco al final del rango (posible cambio de patrón de URL)."""
+    racha = 0
+    for anio in range(anio_hasta, anio_desde - 1, -1):
+        if anual.get(anio) != "hueco":
+            break
+        racha += 1
+    return racha
+
+
 def generar_reporte_cobertura(resultados: list[ResultadoProbe], cfg: dict[str, Any]) -> str:
     """Renderiza ``reports/cobertura.md`` completo a partir de los resultados crudos."""
     anio_desde, anio_hasta = cfg["anios"]["desde"], cfg["anios"]["hasta"]
@@ -848,6 +861,16 @@ def generar_reporte_cobertura(resultados: list[ResultadoProbe], cfg: dict[str, A
     for anio in range(anio_desde, anio_hasta + 1):
         lineas.append(f"| {anio} | {simbolo[anual[anio]]} |")
     lineas.append("")
+    racha_final_hueca = _racha_final_hueca(anual, anio_desde, anio_hasta)
+    if racha_final_hueca:
+        lineas.append(
+            f"> ⚠️ **{anio_hasta - racha_final_hueca + 1}–{anio_hasta} salen todos como hueco** en el "
+            "patrón genérico conocido, con 404 limpios (no error de red -- ver detalle crudo). Dos "
+            "hipótesis quedan abiertas y **sin investigar en esta fase**: (a) la SHCP descontinuó "
+            "OPA en ese punto, o (b) cambió a un patrón de URL no incluido en `sources.yml`. No se "
+            "concluye descontinuación sin antes buscar un patrón nuevo -- eso es trabajo de Fase 1."
+        )
+        lineas.append("")
     lineas.append("## Puerta de decisión (2016–2024, 36 trimestres)")
     lineas.append("")
     lineas.append(f"- Trimestres recuperables: **{recuperables} / {total} ({porcentaje:.1f}%)**")
