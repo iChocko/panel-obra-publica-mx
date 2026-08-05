@@ -103,18 +103,34 @@ def _url_para_descarga(fila: dict[str, Any]) -> str:
     return fila["url"]
 
 
-def descargar_muestra(cliente: httpx.Client, etiqueta: str, fila: dict[str, Any], destino_dir: Path) -> Path:
-    """Descarga una muestra completa (excepción explícita a "solo metadatos" de discovery)."""
+def descargar_muestra(
+    cliente: httpx.Client, etiqueta: str, fila: dict[str, Any], destino_dir: Path, user_agent: str
+) -> Path:
+    """Descarga una muestra completa (excepción explícita a "solo metadatos" de discovery).
+
+    Cae a curl si httpx no puede armar la cadena de certificados -- ver la nota en
+    ``discovery.es_error_cadena_tls`` (caso real y confirmado en dominios .gob.mx).
+    """
     url_descarga = _url_para_descarga(fila)
-    resp = cliente.get(url_descarga, timeout=TIMEOUT_DESCARGA_SEGUNDOS)
-    resp.raise_for_status()
+    try:
+        resp = cliente.get(url_descarga, timeout=TIMEOUT_DESCARGA_SEGUNDOS)
+        resp.raise_for_status()
+        contenido = resp.content
+    except httpx.HTTPError as exc:
+        error = f"{type(exc).__name__}: {exc}"
+        if not discovery.es_error_cadena_tls(error):
+            raise
+        status, _headers, cuerpo = discovery.curl_get(url_descarga, user_agent, TIMEOUT_DESCARGA_SEGUNDOS)
+        if status != 200:
+            raise RuntimeError(f"No se pudo descargar {url_descarga} (tampoco vía curl): {error}") from exc
+        contenido = cuerpo
 
     destino_dir.mkdir(parents=True, exist_ok=True)
     ext = fila["url"].rsplit(".", 1)[-1].split("?")[0].lower()
     trimestre = f"t{fila['trimestre']}" if fila.get("trimestre") else "anual"
     nombre = f"opa_{fila['anio']}_{trimestre}_{etiqueta}_{fila['fuente']}.{ext}"
     ruta = destino_dir / nombre
-    ruta.write_bytes(resp.content)
+    ruta.write_bytes(contenido)
     return ruta
 
 
@@ -302,7 +318,7 @@ def inspect() -> None:
     with httpx.Client(headers=headers, follow_redirects=True) as cliente:
         for etiqueta, fila in muestras.items():
             console.print(f"Descargando muestra [bold]{etiqueta}[/] ({fila['anio']}, fuente={fila['fuente']}) ...")
-            ruta = descargar_muestra(cliente, etiqueta, fila, DIR_MUESTRAS)
+            ruta = descargar_muestra(cliente, etiqueta, fila, DIR_MUESTRAS, cfg["red"]["user_agent"])
             console.print(f"  -> {ruta}")
             inspecciones.append(inspeccionar_archivo(etiqueta, ruta, fila))
 

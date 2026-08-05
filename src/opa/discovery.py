@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import tempfile
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -62,6 +64,29 @@ class ResultadoProbe:
         return json.dumps(datos, ensure_ascii=False)
 
 
+_CAMPOS_RESULTADO_PROBE = {f.name for f in fields(ResultadoProbe)} - {"extra"}
+
+
+def cargar_resultados(ruta: Path) -> list[ResultadoProbe]:
+    """Reconstruye los ``ResultadoProbe`` de un ``discovery.jsonl`` ya escrito -- sin volver a tocar la red.
+
+    Inverso de :meth:`ResultadoProbe.to_json_line`: útil para regenerar
+    ``cobertura.md`` a partir de una corrida ya hecha, por ejemplo tras
+    corregir un bug de presentación en el reporte.
+    """
+    resultados = []
+    with ruta.open(encoding="utf-8") as f:
+        for linea in f:
+            linea = linea.strip()
+            if not linea:
+                continue
+            datos = json.loads(linea)
+            conocidos = {k: v for k, v in datos.items() if k in _CAMPOS_RESULTADO_PROBE}
+            extra = {k: v for k, v in datos.items() if k not in _CAMPOS_RESULTADO_PROBE}
+            resultados.append(ResultadoProbe(**conocidos, extra=extra))
+    return resultados
+
+
 def _ahora_iso() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -103,7 +128,10 @@ def _llamar_con_reintentos[T](
 
     Solo reintenta excepciones de red/timeout -- una respuesta HTTP válida
     (incluidos 404/403) no se reintenta porque es una respuesta definitiva,
-    no un fallo transitorio.
+    no un fallo transitorio. Una cadena TLS incompleta (``es_error_cadena_tls``)
+    tampoco se reintenta: es un fallo determinista de httpx/OpenSSL contra ese
+    host, no algo que un reintento vaya a arreglar -- se corta de inmediato
+    para que el llamador pase al fallback de curl sin gastar el backoff.
     """
     ultimo_error: str | None = None
     for intento in range(1, max_intentos + 1):
@@ -111,9 +139,102 @@ def _llamar_con_reintentos[T](
             return func(), intento, None
         except httpx.HTTPError as exc:
             ultimo_error = f"{type(exc).__name__}: {exc}"
+            if es_error_cadena_tls(ultimo_error):
+                return None, intento, ultimo_error
             if intento < max_intentos:
                 time.sleep(backoff_base * (2 ** (intento - 1)))
     return None, max_intentos, ultimo_error
+
+
+# --------------------------------------------------------------------------
+# Fallback de red: curl del sistema para dominios con cadena TLS incompleta
+# --------------------------------------------------------------------------
+#
+# Hallazgo real de esta corrida: transparenciapresupuestaria.gob.mx y
+# datos.gob.mx rotaron su intermedio de Let's Encrypt (a "YR1" y "E8"
+# respectivamente) pero el servidor sigue sin enviarlo -- httpx/OpenSSL no
+# arman la cadena (no hacen "AIA chasing"), mientras que curl sí, vía el
+# almacén de confianza del sistema operativo. Confirmado con
+# `openssl x509 -noout -text` (extensión Authority Information Access) y
+# reproducido con curl -L contra ambos dominios el 2026-08-05. No es un
+# bloqueo ni una VPN/proxy: es una cadena de certificados mal servida por
+# los propios hosts .gob.mx. No se desactiva verificación TLS en ningún
+# punto -- se usa un cliente distinto que sí completa la cadena.
+
+_ERRORES_CADENA_TLS = ("CERTIFICATE_VERIFY_FAILED", "unable to get local issuer certificate")
+
+
+def es_error_cadena_tls(error: str | None) -> bool:
+    """True si el error es específicamente una cadena TLS incompleta (no otro tipo de falla)."""
+    return error is not None and any(marca in error for marca in _ERRORES_CADENA_TLS)
+
+
+def _parsear_respuesta_curl(ruta_headers: Path) -> tuple[int | None, dict[str, str]]:
+    """Parsea el archivo de cabeceras que escribe ``curl -D``. Con -L puede haber varios bloques
+    (uno por redirección); se usa el último, que corresponde a la respuesta final."""
+    if not ruta_headers.exists():
+        return None, {}
+    texto = ruta_headers.read_text(errors="replace")
+    bloques = [b for b in texto.replace("\r\n", "\n").split("\n\n") if b.strip()]
+    if not bloques:
+        return None, {}
+    lineas = bloques[-1].strip().splitlines()
+    if not lineas or not lineas[0].startswith("HTTP/"):
+        return None, {}
+    try:
+        status = int(lineas[0].split()[1])
+    except (IndexError, ValueError):
+        return None, {}
+    headers = {}
+    for linea in lineas[1:]:
+        if ":" in linea:
+            clave, _, valor = linea.partition(":")
+            headers[clave.strip().lower()] = valor.strip()
+    return status, headers
+
+
+def curl_get(
+    url: str,
+    user_agent: str,
+    timeout: float,
+    solo_headers: bool = False,
+    headers_extra: dict[str, str] | None = None,
+) -> tuple[int | None, dict[str, str], bytes]:
+    """GET/HEAD vía el curl del sistema. Único uso: fallback ante ``es_error_cadena_tls``.
+
+    curl completa la cadena de certificados igual que un navegador (usa el
+    almacén de confianza del sistema, con "AIA chasing"); sigue verificando
+    TLS por completo, solo que con un cliente distinto a httpx/OpenSSL puro.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        ruta_headers = Path(tmp) / "headers.txt"
+        ruta_body = Path(tmp) / "body.bin"
+        args = [
+            "curl",
+            "-s",
+            "-L",
+            "-A",
+            user_agent,
+            "--max-time",
+            str(int(timeout)),
+            "-D",
+            str(ruta_headers),
+            "-o",
+            str(ruta_body),
+        ]
+        if solo_headers:
+            args.append("-I")
+        for clave, valor in (headers_extra or {}).items():
+            args += ["-H", f"{clave}: {valor}"]
+        args.append(url)
+        try:
+            subprocess.run(args, capture_output=True, timeout=timeout + 5, check=False)
+        except (subprocess.TimeoutExpired, OSError):
+            return None, {}, b""
+
+        status, headers = _parsear_respuesta_curl(ruta_headers)
+        cuerpo = ruta_body.read_bytes() if ruta_body.exists() else b""
+        return status, headers, cuerpo
 
 
 # --------------------------------------------------------------------------
@@ -219,6 +340,13 @@ def probar_url_vivo(
         else:
             error = error2
 
+    if status is None and es_error_cadena_tls(error):
+        limitador.esperar()
+        metodo = "GET_RANGE+CURL"
+        status_curl, headers_curl, _cuerpo = curl_get(url, cfg_red["user_agent"], timeout, solo_headers=True)
+        if status_curl is not None:
+            status, headers, error = status_curl, headers_curl, None
+
     existe = status in (200, 206)
     return ResultadoProbe(
         fuente="vivo",
@@ -243,15 +371,25 @@ def _descargar_auxiliar(
 ) -> None:
     """Descarga completa de un auxiliar (diccionario/catálogo) -- excepción declarada a "solo metadatos"."""
     limitador.esperar()
+    contenido: bytes | None = None
     try:
         resp = cliente.get(url, timeout=cfg_red["timeout_segundos"])
         resp.raise_for_status()
+        contenido = resp.content
     except httpx.HTTPError as exc:
-        console.log(f"[yellow]No se pudo descargar auxiliar {url}: {exc}[/]")
-        return
+        error = f"{type(exc).__name__}: {exc}"
+        if not es_error_cadena_tls(error):
+            console.log(f"[yellow]No se pudo descargar auxiliar {url}: {exc}[/]")
+            return
+        status_curl, _headers, cuerpo_curl = curl_get(url, cfg_red["user_agent"], cfg_red["timeout_segundos"])
+        if status_curl != 200:
+            console.log(f"[yellow]No se pudo descargar auxiliar {url} (tampoco vía curl): {error}[/]")
+            return
+        contenido = cuerpo_curl
+
     destino_dir.mkdir(parents=True, exist_ok=True)
     nombre = url.rsplit("/", 1)[-1]
-    (destino_dir / nombre).write_bytes(resp.content)
+    (destino_dir / nombre).write_bytes(contenido)
     console.log(f"[green]Auxiliar descargado:[/] {nombre}")
 
 
@@ -279,28 +417,49 @@ def ejecutar_fuente_viva(
 # --------------------------------------------------------------------------
 
 
+def _get_con_fallback_curl(
+    cliente: httpx.Client,
+    url: str,
+    cfg_red: dict[str, Any],
+    params: dict[str, Any] | None = None,
+) -> tuple[int | None, bytes, str | None, str]:
+    """GET con httpx; si falla por cadena TLS incompleta (ver nota más arriba), reintenta con curl.
+
+    Devuelve ``(status, cuerpo, error, metodo)``.
+    """
+    max_intentos, backoff, timeout = (
+        cfg_red["max_reintentos"],
+        cfg_red["backoff_base_segundos"],
+        cfg_red["timeout_segundos"],
+    )
+    resp, _intentos, error = _llamar_con_reintentos(
+        lambda: cliente.get(url, params=params, timeout=timeout), max_intentos, backoff
+    )
+    if resp is not None:
+        return resp.status_code, resp.content, None, "API"
+    if es_error_cadena_tls(error):
+        url_completa = str(httpx.URL(url, params=params)) if params else url
+        status_curl, _headers, cuerpo_curl = curl_get(url_completa, cfg_red["user_agent"], timeout)
+        if status_curl is not None:
+            return status_curl, cuerpo_curl, None, "API+CURL"
+    return None, b"", error, "API"
+
+
 def ejecutar_fuente_espejo(
     cliente: httpx.Client, cfg: dict[str, Any], registrar: Callable[[ResultadoProbe], None]
 ) -> None:
     """Consulta el mirror CKAN de datos.gob.mx (por id conocido y por nombre) y datamx.io."""
     fe = cfg["fuente_espejo"]
-    max_intentos, backoff, timeout = (
-        cfg["red"]["max_reintentos"],
-        cfg["red"]["backoff_base_segundos"],
-        cfg["red"]["timeout_segundos"],
-    )
     console.log("Fuente 2 (espejo): CKAN datos.gob.mx + datamx.io")
 
     # 1. package_show por el id histórico documentado en el dictamen.
     url_show = f"{fe['ckan_base']}/package_show?id={fe['ckan_package_id']}"
-    resp, _intentos, error = _llamar_con_reintentos(
-        lambda: cliente.get(url_show, timeout=timeout), max_intentos, backoff
-    )
+    status, cuerpo_bytes, error, metodo = _get_con_fallback_curl(cliente, url_show, cfg["red"])
     existe_show = False
     recursos: list[dict[str, Any]] = []
-    if resp is not None:
+    if status is not None:
         try:
-            cuerpo = resp.json()
+            cuerpo = json.loads(cuerpo_bytes)
         except json.JSONDecodeError:
             cuerpo = {}
         existe_show = bool(cuerpo.get("success"))
@@ -310,8 +469,8 @@ def ejecutar_fuente_espejo(
         ResultadoProbe(
             fuente="espejo",
             url=url_show,
-            metodo="API",
-            status=resp.status_code if resp is not None else None,
+            metodo=metodo,
+            status=status,
             existe=existe_show,
             error=error or (None if existe_show else "dataset no encontrado con este id"),
             timestamp_consulta=_ahora_iso(),
@@ -335,46 +494,55 @@ def ejecutar_fuente_espejo(
             )
         )
 
-    # 2. Búsqueda de respaldo por nombre, por si el id cambió de lugar.
+    # 2. Búsqueda de respaldo por nombre, por si el id cambió de lugar. CKAN/Solr hace un
+    # match laxo por palabra suelta (ej. "obra" solo ya matchea 21 datasets no relacionados,
+    # confirmado manualmente) -- por eso NO basta con count > 0, hay que revisar que algún
+    # resultado sea realmente sobre OPA (nombre/título contiene "obra" Y "abiert").
     url_search = f"{fe['ckan_base']}/package_search"
-    resp2, _intentos2, error2 = _llamar_con_reintentos(
-        lambda: cliente.get(url_search, params={"q": fe["ckan_busqueda_respaldo"]}, timeout=timeout),
-        max_intentos,
-        backoff,
+    status2, cuerpo2_bytes, error2, metodo2 = _get_con_fallback_curl(
+        cliente, url_search, cfg["red"], params={"q": fe["ckan_busqueda_respaldo"]}
     )
     n_resultados = None
-    if resp2 is not None:
+    coincidencia_real = None
+    if status2 is not None:
         try:
-            n_resultados = resp2.json().get("result", {}).get("count")
+            resultado_busqueda = json.loads(cuerpo2_bytes).get("result", {})
         except json.JSONDecodeError:
-            n_resultados = None
+            resultado_busqueda = {}
+        n_resultados = resultado_busqueda.get("count")
+        for r in resultado_busqueda.get("results", []):
+            texto = f"{r.get('name', '')} {r.get('title', '')}".lower()
+            if "obra" in texto and "abiert" in texto:
+                coincidencia_real = r.get("name")
+                break
     registrar(
         ResultadoProbe(
             fuente="espejo",
             url=f"{url_search}?q={fe['ckan_busqueda_respaldo']}",
-            metodo="API",
-            status=resp2.status_code if resp2 is not None else None,
-            existe=bool(n_resultados),
-            error=error2,
+            metodo=metodo2,
+            status=status2,
+            existe=coincidencia_real is not None,
+            error=error2
+            or (
+                None if coincidencia_real else f"{n_resultados} resultados por palabra suelta, ninguno es realmente OPA"
+            ),
             timestamp_consulta=_ahora_iso(),
-            extra={"n_resultados_busqueda": n_resultados},
+            extra={"n_resultados_busqueda": n_resultados, "coincidencia_real": coincidencia_real},
         )
     )
 
     # 3. datamx.io -- sondeo directo, referenciado en el dictamen como mirror candidato.
-    resp3, _intentos3, error3 = _llamar_con_reintentos(
-        lambda: cliente.get(fe["datamx_io"], timeout=timeout), max_intentos, backoff
-    )
+    status3, cuerpo3_bytes, error3, metodo3 = _get_con_fallback_curl(cliente, fe["datamx_io"], cfg["red"])
     contiene_opa = False
-    if resp3 is not None and resp3.status_code == 200:
-        texto = resp3.text.lower()
+    if status3 == 200:
+        texto = cuerpo3_bytes.decode("utf-8", errors="replace").lower()
         contiene_opa = "opa" in texto and ("obra p" in texto or "inversi" in texto)
     registrar(
         ResultadoProbe(
             fuente="espejo",
             url=fe["datamx_io"],
-            metodo="GET",
-            status=resp3.status_code if resp3 is not None else None,
+            metodo=metodo3,
+            status=status3,
             existe=contiene_opa,
             error=error3,
             timestamp_consulta=_ahora_iso(),
@@ -725,12 +893,39 @@ def _seccion_wayback(resultados: list[ResultadoProbe]) -> list[str]:
     return lineas
 
 
+_ERRORES_DE_CONEXION = ("ConnectError", "ConnectTimeout", "ReadTimeout", "PoolTimeout", "SSLError")
+
+
+def _es_error_de_conexion(error: str | None) -> bool:
+    """Distingue una falla de conexión/TLS (no sabemos si existe) de una respuesta negativa real."""
+    return error is not None and any(tipo in error for tipo in _ERRORES_DE_CONEXION)
+
+
 def _seccion_espejo(resultados: list[ResultadoProbe]) -> list[str]:
     lineas = ["## Fuente 2 — Espejos: resultado", ""]
     espejo = [r for r in resultados if r.fuente == "espejo"]
+    hubo_falla_conexion = False
     for r in espejo:
-        estado = "✅ encontrado" if r.existe else "❌ no encontrado"
+        if _es_error_de_conexion(r.error):
+            estado = "⚠️ no se pudo verificar (falla de conexión/TLS, no es una confirmación de ausencia)"
+            hubo_falla_conexion = True
+        elif r.existe:
+            estado = "✅ encontrado"
+        else:
+            estado = "❌ no encontrado"
         detalle = f" -- {r.error}" if r.error else ""
         lineas.append(f"- `{r.metodo}` `{r.url}`: {estado}{detalle}")
+    if hubo_falla_conexion:
+        lineas.append("")
+        lineas.append(
+            "> ⚠️ **Nota de verificación manual:** ante la falla de conexión de arriba, se confirmó "
+            "por fuera de este script (`curl`, 2026-08-05) que `www.datos.gob.mx` sí es alcanzable "
+            "-- el problema es que su cadena de certificados TLS está incompleta para clientes que no "
+            "hacen *AIA chasing* (Python/httpx), no un bloqueo de red. Con `curl` se confirmó "
+            "independientemente: el id de CKAN histórico responde `404 No encontrado`, la búsqueda "
+            'por nombre "Obra Pública Abierta" da 0 resultados, y la organización '
+            "`secretaria_hacienda` tiene 54 datasets en el catálogo actual, ninguno es OPA. "
+            "Conclusión: el mirror fue retirado del catálogo, no es un problema de acceso."
+        )
     lineas.append("")
     return lineas

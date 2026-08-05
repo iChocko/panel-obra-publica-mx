@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import httpx
+
 from opa.discovery import (
     ResultadoProbe,
+    _es_error_de_conexion,
+    _llamar_con_reintentos,
+    _parsear_respuesta_curl,
     calcular_recuperabilidad,
+    cargar_resultados,
     clasificar_captura,
     construir_cobertura_anual_generica,
     construir_matriz_trimestral,
+    es_error_cadena_tls,
     generar_urls_vivas,
     recomendar,
 )
@@ -165,3 +174,89 @@ def test_resultado_probe_to_json_line_aplana_extra() -> None:
     linea = r.to_json_line()
     assert '"wayback_timestamp": "20190101000000"' in linea
     assert '"extra"' not in linea
+
+
+def test_cargar_resultados_es_inverso_de_to_json_line(tmp_path) -> None:
+    original = ResultadoProbe(
+        fuente="wayback",
+        url="x",
+        metodo="WAYBACK_CAPTURE",
+        status=200,
+        anio=2018,
+        trimestre=3,
+        extra={"wayback_timestamp": "20190101000000", "digest": "abc"},
+    )
+    ruta = tmp_path / "discovery.jsonl"
+    ruta.write_text(original.to_json_line() + "\n", encoding="utf-8")
+
+    (recuperado,) = cargar_resultados(ruta)
+
+    assert recuperado.fuente == original.fuente
+    assert recuperado.anio == 2018
+    assert recuperado.trimestre == 3
+    assert recuperado.extra == {"wayback_timestamp": "20190101000000", "digest": "abc"}
+
+
+def test_es_error_de_conexion_distingue_ssl_de_negativo_real() -> None:
+    assert _es_error_de_conexion("ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] ...") is True
+    assert _es_error_de_conexion("dataset no encontrado con este id") is False
+    assert _es_error_de_conexion(None) is False
+
+
+def test_es_error_cadena_tls_detecta_caso_real_gob_mx() -> None:
+    mensaje = (
+        "ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+        "unable to get local issuer certificate (_ssl.c:1010)"
+    )
+    assert es_error_cadena_tls(mensaje) is True
+    assert es_error_cadena_tls("ConnectTimeout: timed out") is False
+    assert es_error_cadena_tls(None) is False
+
+
+def test_parsear_respuesta_curl_toma_el_ultimo_bloque_tras_redireccion(tmp_path) -> None:
+    ruta = tmp_path / "headers.txt"
+    ruta.write_text(
+        "HTTP/1.1 301 Moved Permanently\r\nLocation: https://x/y\r\n\r\n"
+        "HTTP/2 200\r\nContent-Type: text/csv\r\nContent-Length: 42\r\n\r\n",
+        encoding="utf-8",
+    )
+    status, headers = _parsear_respuesta_curl(ruta)
+    assert status == 200
+    assert headers["content-type"] == "text/csv"
+    assert headers["content-length"] == "42"
+
+
+def test_parsear_respuesta_curl_sin_archivo() -> None:
+    assert _parsear_respuesta_curl(Path("/no/existe/nada.txt")) == (None, {})
+
+
+def test_llamar_con_reintentos_no_reintenta_cadena_tls_incompleta() -> None:
+    llamadas = []
+
+    def falla_siempre():
+        llamadas.append(1)
+        raise httpx.HTTPError(
+            "ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+            "unable to get local issuer certificate"
+        )
+
+    resultado, intentos, error = _llamar_con_reintentos(falla_siempre, max_intentos=3, backoff_base=0.01)
+    assert resultado is None
+    assert intentos == 1
+    assert len(llamadas) == 1
+    assert error is not None and "CERTIFICATE_VERIFY_FAILED" in error
+
+
+def test_llamar_con_reintentos_si_reintenta_error_transitorio() -> None:
+    llamadas = []
+
+    def falla_dos_veces_y_luego_ok():
+        llamadas.append(1)
+        if len(llamadas) < 3:
+            raise httpx.HTTPError("ConnectTimeout: timed out")
+        return "ok"
+
+    resultado, intentos, error = _llamar_con_reintentos(falla_dos_veces_y_luego_ok, max_intentos=3, backoff_base=0.01)
+    assert resultado == "ok"
+    assert intentos == 3
+    assert error is None

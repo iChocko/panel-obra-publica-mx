@@ -24,11 +24,14 @@ real medida y la recomendación resultante de la puerta de decisión._
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
 
 ```bash
-# --no-editable evita un problema de instalación editable observado en algunos
-# entornos sandbox (el .pth no se procesa); funciona igual en una máquina normal.
-uv sync --no-editable
+# UV_NO_EDITABLE evita un problema de instalación editable observado en algunos
+# entornos sandbox (el .pth de instalación editable no se procesa). No hace
+# falta en una máquina normal, pero tampoco estorba -- uv run vuelve a
+# sincronizar el entorno en cada invocación, así que se exporta una sola vez.
+export UV_NO_EDITABLE=1
+uv sync
 
-# Descubrimiento: prueba ~280 URLs candidatas contra la SHCP (a 1 req/2s, ≈10 min),
+# Descubrimiento: prueba ~280 URLs candidatas contra la SHCP (a 1 req/2s, ≈10-18 min),
 # consulta el mirror CKAN de datos.gob.mx y la CDX API del Wayback Machine.
 # Escribe reports/discovery.jsonl y reports/cobertura.md.
 uv run opa discover
