@@ -1,6 +1,6 @@
 # Matriz de cobertura — Obra Pública Abierta (OPA)
 
-*Generado por `opa discover` el 2026-08-05T05:50:04.176131+00:00.*
+*Generado por `opa discover` el 2026-08-08T04:13:22.462669+00:00.*
 
 ## Leyenda
 
@@ -18,13 +18,13 @@
 | 2017 | 🟢 vivo | 🟢 vivo | 🟢 vivo | ⚪ hueco |
 | 2018 | ⚪ hueco | ⚪ hueco | 🟢 vivo | ⚪ hueco |
 | 2019 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2020 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2021 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2022 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2023 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2024 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2025 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2026 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
+| 2020 | 🟢 vivo | 🟢 vivo | ⚪ hueco | ⚪ hueco |
+| 2021 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
+| 2022 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
+| 2023 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
+| 2024 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
+| 2025 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
+| 2026 | 🟢 vivo | ⚪ hueco | ⚪ hueco | ⚪ hueco |
 
 ## Cobertura anual (patrón genérico `proyectos_opa.csv` / `.xlsx`)
 
@@ -45,12 +45,12 @@
 | 2025 | ⚪ hueco |
 | 2026 | ⚪ hueco |
 
-> ⚠️ **2022–2026 salen todos como hueco** en el patrón genérico conocido, con 404 limpios (no error de red -- ver detalle crudo). Dos hipótesis quedan abiertas y **sin investigar en esta fase**: (a) la SHCP descontinuó OPA en ese punto, o (b) cambió a un patrón de URL no incluido en `sources.yml`. No se concluye descontinuación sin antes buscar un patrón nuevo -- eso es trabajo de Fase 1.
+> ℹ️ **2022–2026 salen como hueco en este patrón genérico específico** (sin trimestre en el nombre), con 404 limpios -- pero **no es un hueco de datos real**: la matriz trimestral de arriba sí tiene cobertura para estos años bajo otro nombre de archivo (investigado en Fase 1, ver README). El portal retiró este nombre genérico a favor de archivos con trimestre explícito en el nombre.
 
 ## Puerta de decisión (2016–2024, 36 trimestres)
 
-- Trimestres recuperables: **4 / 36 (11.1%)**
-- Recomendación: **Pivotar a panel anual (Tomo VIII del PEF + OPA anual) y usar SRFT para la capa subnacional georreferenciada.**
+- Trimestres recuperables: **22 / 36 (61.1%)**
+- Recomendación: **Panel trimestral parcial, huecos documentados en el reporte de calidad.**
 
 ## Wayback — detalle de la pregunta clave
 
@@ -65,6 +65,6 @@
 ## Fuente 2 — Espejos: resultado
 
 - `API+CURL` `https://www.datos.gob.mx/api/3/action/package_show?id=56b98e14-41ba-4edd-b8a8-c96d5008b071`: ❌ no encontrado -- dataset no encontrado con este id
-- `API+CURL` `https://www.datos.gob.mx/api/3/action/package_search?q=Obra Pública Abierta`: ❌ no encontrado -- 21 resultados por palabra suelta, ninguno es realmente OPA
+- `API+CURL` `https://www.datos.gob.mx/api/3/action/package_search?q=Obra Pública Abierta`: ❌ no encontrado -- 22 resultados por palabra suelta, ninguno es realmente OPA
 - `API` `https://datamx.io`: ❌ no encontrado
 

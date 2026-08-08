@@ -8,6 +8,7 @@ import httpx
 
 from opa.discovery import (
     ResultadoProbe,
+    _anios_con_cobertura_trimestral,
     _es_error_de_conexion,
     _llamar_con_reintentos,
     _parsear_respuesta_curl,
@@ -18,6 +19,7 @@ from opa.discovery import (
     construir_cobertura_anual_generica,
     construir_matriz_trimestral,
     es_error_cadena_tls,
+    generar_reporte_cobertura,
     generar_urls_vivas,
     recomendar,
 )
@@ -108,6 +110,25 @@ def test_clasificar_captura_patron_antiguo() -> None:
 def test_clasificar_captura_no_reconocido() -> None:
     anio, trimestre, patron = clasificar_captura("https://example.mx/algo/no/relacionado.pdf")
     assert (anio, trimestre, patron) == (None, None, "no_reconocido")
+
+
+def test_clasificar_captura_trimestral_nuevo() -> None:
+    # Patrón que reemplazó a reporteOPA{ord}Trimestre a partir de ~2020 (Fase 1).
+    url = "https://www.transparenciapresupuestaria.gob.mx/work/models/PTP/DatosAbiertos/OPA/2022/ConsolidadoOPA1erTrimestre2022.csv"
+    anio, trimestre, patron = clasificar_captura(url)
+    assert (anio, trimestre, patron) == (2022, 1, "trimestral_nuevo")
+
+
+def test_clasificar_captura_trimestral_nuevo_concluido_singular_y_plural() -> None:
+    # "Concluido(s)" alterna singular/plural sin regla clara por año -- ambas formas son válidas.
+    singular = clasificar_captura(
+        "https://www.transparenciapresupuestaria.gob.mx/work/models/PTP/DatosAbiertos/OPA/2025/ConcluidoOPA4toTrimestre2025.csv"
+    )
+    plural = clasificar_captura(
+        "https://www.transparenciapresupuestaria.gob.mx/work/models/PTP/DatosAbiertos/OPA/2022/ConcluidosOPA1erTrimestre2022.csv"
+    )
+    assert singular == (2025, 4, "trimestral_nuevo")
+    assert plural == (2022, 1, "trimestral_nuevo")
 
 
 def _probe(anio: int, trimestre: int, fuente: str, patron: str = "trimestral_numerico") -> ResultadoProbe:
@@ -284,3 +305,29 @@ def test_racha_final_hueca_detecta_huecos_al_final_del_rango() -> None:
 def test_racha_final_hueca_cero_si_el_ultimo_anio_tiene_datos() -> None:
     anual = {2020: "hueco", 2021: "vivo", 2022: "hueco", 2023: "hueco", 2024: "vivo"}
     assert _racha_final_hueca(anual, 2020, 2024) == 0
+
+
+def test_anios_con_cobertura_trimestral_exige_al_menos_un_trimestre_vivo() -> None:
+    matriz = {(2017, t): "hueco" for t in (1, 2, 3, 4)}
+    matriz[(2017, 1)] = "vivo"
+    matriz.update({(2018, t): "hueco" for t in (1, 2, 3, 4)})
+    assert _anios_con_cobertura_trimestral(matriz, 2017, 2018) == {2017}
+
+
+def test_generar_reporte_cobertura_no_alarma_si_el_hueco_generico_tiene_respaldo_trimestral() -> None:
+    # Caso real de Fase 1: 2018 no tiene el archivo anual genérico, pero sí trimestrales bajo
+    # el patrón nuevo -- no es un hueco de datos real, solo de ese nombre de archivo específico.
+    resultados = [
+        _probe(2017, None, "vivo", patron="anual_generico"),
+        _probe(2018, 1, "vivo", patron="trimestral_nuevo"),
+    ]
+    reporte = generar_reporte_cobertura(resultados, CFG_MINIMA)
+    assert "no es un hueco de datos real" in reporte
+    assert "Dos hipótesis quedan abiertas" not in reporte
+
+
+def test_generar_reporte_cobertura_alarma_si_no_hay_respaldo_trimestral() -> None:
+    resultados = [_probe(2017, None, "vivo", patron="anual_generico")]
+    reporte = generar_reporte_cobertura(resultados, CFG_MINIMA)
+    assert "Dos hipótesis quedan abiertas" in reporte
+    assert "no es un hueco de datos real" not in reporte

@@ -572,6 +572,15 @@ _PATRONES_CLASIFICACION: list[tuple[re.Pattern[str], str]] = [
         "trimestral_ordinal",
     ),
     (
+        # Patrón nuevo descubierto en Fase 1 (2026-08): reemplaza a reporteOPA{ord}Trimestre
+        # a partir de ~2020. "Concluido(s)" alterna singular/plural sin regla clara por año.
+        re.compile(
+            r"/OPA/(?P<anio>\d{4})/(Consolidado|Concluidos?|Seguimiento)OPA(?P<ord>1er|2do|3er|4to)Trimestre\d{4}\.csv",
+            re.IGNORECASE,
+        ),
+        "trimestral_nuevo",
+    ),
+    (
         re.compile(r"/DatosAbiertos/OPA/(?P<anio>\d{4})/proyectos_opa\.(csv|xlsx)", re.IGNORECASE),
         "anual_generico",
     ),
@@ -817,6 +826,15 @@ def _racha_final_hueca(anual: dict[int, str], anio_desde: int, anio_hasta: int) 
     return racha
 
 
+def _anios_con_cobertura_trimestral(matriz: dict[tuple[int, int], str], anio_desde: int, anio_hasta: int) -> set[int]:
+    """Años que tienen al menos un trimestre no-hueco en la matriz trimestral."""
+    return {
+        anio
+        for anio in range(anio_desde, anio_hasta + 1)
+        if any(matriz[(anio, t)] != "hueco" for t in (1, 2, 3, 4))
+    }
+
+
 def generar_reporte_cobertura(resultados: list[ResultadoProbe], cfg: dict[str, Any]) -> str:
     """Renderiza ``reports/cobertura.md`` completo a partir de los resultados crudos."""
     anio_desde, anio_hasta = cfg["anios"]["desde"], cfg["anios"]["hasta"]
@@ -863,13 +881,24 @@ def generar_reporte_cobertura(resultados: list[ResultadoProbe], cfg: dict[str, A
     lineas.append("")
     racha_final_hueca = _racha_final_hueca(anual, anio_desde, anio_hasta)
     if racha_final_hueca:
-        lineas.append(
-            f"> ⚠️ **{anio_hasta - racha_final_hueca + 1}–{anio_hasta} salen todos como hueco** en el "
-            "patrón genérico conocido, con 404 limpios (no error de red -- ver detalle crudo). Dos "
-            "hipótesis quedan abiertas y **sin investigar en esta fase**: (a) la SHCP descontinuó "
-            "OPA en ese punto, o (b) cambió a un patrón de URL no incluido en `sources.yml`. No se "
-            "concluye descontinuación sin antes buscar un patrón nuevo -- eso es trabajo de Fase 1."
-        )
+        anio_racha_desde = anio_hasta - racha_final_hueca + 1
+        anios_con_trimestral = _anios_con_cobertura_trimestral(matriz, anio_desde, anio_hasta)
+        if all(anio in anios_con_trimestral for anio in range(anio_racha_desde, anio_hasta + 1)):
+            lineas.append(
+                f"> ℹ️ **{anio_racha_desde}–{anio_hasta} salen como hueco en este patrón genérico "
+                "específico** (sin trimestre en el nombre), con 404 limpios -- pero **no es un hueco "
+                "de datos real**: la matriz trimestral de arriba sí tiene cobertura para estos años "
+                "bajo otro nombre de archivo (investigado en Fase 1, ver README). El portal retiró "
+                "este nombre genérico a favor de archivos con trimestre explícito en el nombre."
+            )
+        else:
+            lineas.append(
+                f"> ⚠️ **{anio_racha_desde}–{anio_hasta} salen todos como hueco** en el patrón "
+                "genérico conocido, con 404 limpios (no error de red -- ver detalle crudo). Dos "
+                "hipótesis quedan abiertas: (a) la SHCP descontinuó OPA en ese punto, o (b) cambió a "
+                "un patrón de URL no incluido en `sources.yml`. No se concluye descontinuación sin "
+                "antes buscar un patrón nuevo."
+            )
         lineas.append("")
     lineas.append("## Puerta de decisión (2016–2024, 36 trimestres)")
     lineas.append("")
