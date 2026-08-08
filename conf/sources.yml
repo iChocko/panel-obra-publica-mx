@@ -52,11 +52,16 @@ fuente_viva:
   # nomenclatura irregular que no sigue ningún patrón parametrizable de arriba -- no se
   # generan por producto cartesiano {anio}x{ord}, se prueban tal cual. Encontradas siguiendo
   # el manifiesto oficial del portal (row-down-opa.json, ver auxiliares), que etiqueta cada
-  # URL con su trimestre en texto plano. El archivo de 2020 cubre T3 y T4 juntos en un solo
-  # CSV -- se repite la misma URL con trimestre 3 y 4 para que ambas celdas de la matriz
-  # queden cubiertas (2 requests a la misma URL, redundante pero simple y correcto).
+  # URL con su trimestre en texto plano -- PERO esa etiqueta no es confiable sin verificar el
+  # contenido: "opa_trimestral.csv" venía etiquetado "Primer trimestre 2019" y en realidad
+  # tiene CICLO=2018 en el 100% de sus filas (ver auxiliares abajo, no se usa como caso
+  # especial). OPAPrimerTrimestre2019.csv sí se verificó con CICLO=2019 en el 100% de sus
+  # filas -- ese es el T1 2019 real. El archivo de 2020 cubre T3 y T4 juntos en un solo CSV,
+  # sin columna que distinga trimestre por fila (verificado, ver README) -- se repite la misma
+  # URL con trimestre 3 y 4 asumiendo que es el corte combinado oficial de ese periodo, no un
+  # error nuestro de conteo.
   casos_especiales:
-    - url: "/work/models/PTP/DatosAbiertos/OPA/2019/opa_trimestral.csv"
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2019/OPAPrimerTrimestre2019.csv"
       anio: 2019
       trimestre: 1
     - url: "/work/models/PTP/DatosAbiertos/OPA/2019/OPASegundoTrimestre2019.csv"
@@ -87,6 +92,12 @@ fuente_viva:
     # mismo dataset OPA que vale la pena preservar.
     - "/work/models/PTP/DatosAbiertos/OPA/2020/ConcluidoOPA3er4toTrimestre2020.csv"
     - "/work/models/PTP/DatosAbiertos/OPA/2019/opa_concluidos.csv"  # concluidos acumulado desde 2015
+    # Verificado por contenido (Fase 1b) como CICLO=2018, no 2019 T1 pese a que el manifiesto
+    # oficial lo etiqueta "Primer trimestre 2019" y vive en la carpeta /2019/. Publicado
+    # 2019-03-07 (Last-Modified) -- posible cierre de un trimestre de 2018 (¿T4?), sin
+    # confirmar a nivel de fila. No se usa para llenar ninguna celda de la matriz; se conserva
+    # como dato real archivable y pista para investigar en Fase 2.
+    - "/work/models/PTP/DatosAbiertos/OPA/2019/opa_trimestral.csv"
 
 # --- Fuente 2: espejos ----------------------------------------------------
 fuente_espejo:

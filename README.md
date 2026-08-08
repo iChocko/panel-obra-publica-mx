@@ -46,13 +46,22 @@ Hallazgos clave:
   `data/auxiliares/`) con sus enlaces vigentes -- útil como referencia cruzada, aunque solo cubre
   el trimestre más reciente de cada archivo, no el histórico completo.
 - **2019 completo y 2020 T3/T4 también se resolvieron, vía el mismo manifiesto oficial**, que
-  etiqueta cada URL con su trimestre en texto plano (no solo por nombre de archivo). Son 6 URLs
-  exactas con una TERCERA nomenclatura irregular, propia de esos dos años y sin patrón
-  parametrizable (`opa_trimestral.csv`, `OPASegundoTrimestre2019.csv`, `OPATercerTrimestre2019.csv`
-  -- el manifiesto trae un typo, `OPATerceTrimestre2019.csv`, que da 404 --,
-  `OPA4toTrimestre2019.csv`, y `OPA3er4toTrimestre2020.csv` que cubre T3 y T4 de 2020 en un solo
-  archivo combinado). Documentadas como `casos_especiales` en `conf/sources.yml` en vez de forzarlas
-  al mecanismo de patrones parametrizados.
+  etiqueta cada URL con su trimestre en texto plano (no solo por nombre de archivo) -- pero **esa
+  etiqueta resultó no ser confiable sin verificar el contenido**: `opa_trimestral.csv` venía
+  etiquetado "Primer trimestre 2019" y vive en la carpeta `/2019/`, pero al inspeccionarlo tiene
+  `CICLO=2018` en el 100% de sus filas -- no es T1 2019, es un archivo de otro ciclo fiscal mal
+  ubicado (o mal etiquetado) por el propio portal. El T1 2019 real es `OPAPrimerTrimestre2019.csv`
+  (`CICLO=2019` confirmado en sus 1,513 filas), encontrado por analogía de patrón, no por el
+  manifiesto. `opa_trimestral.csv` se conserva como auxiliar archivable (dato real, solo que de
+  2018) en vez de usarse para llenar la celda de T1 2019. El resto son 5 URLs exactas con la misma
+  nomenclatura irregular (`OPASegundoTrimestre2019.csv`, `OPATercerTrimestre2019.csv` -- el
+  manifiesto trae un typo, `OPATerceTrimestre2019.csv`, que da 404 --, `OPA4toTrimestre2019.csv`, y
+  `OPA3er4toTrimestre2020.csv`). Este último cubre T3 y T4 de 2020 en un solo archivo -- se
+  verificó que **no trae ninguna columna que distinga fila por trimestre** (`CICLO` es un único
+  valor, `2020`, en las 1,549 filas), así que se cuenta como el corte combinado oficial de ese
+  periodo tal como lo publicó la SHCP, no como dos trimestres verificables por separado a nivel de
+  fila. Todas documentadas como `casos_especiales` en `conf/sources.yml` en vez de forzarlas al
+  mecanismo de patrones parametrizados.
 - **La hipótesis de que OPA se fusionó con el Tomo VIII del PEF es falsa.** Tomo VIII sí tiene un
   CSV real y vivo 2022-2025 (`REPORTE_TOMO_VIII.csv`), pero es presupuesto ex-ante -- sin avance
   físico, monto ejercido ni geolocalización -- nunca pudo sustituir a OPA en granularidad. Son

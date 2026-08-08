@@ -1,6 +1,6 @@
 # Matriz de cobertura — Obra Pública Abierta (OPA)
 
-*Generado por `opa discover` el 2026-08-08T04:46:47.163588+00:00.*
+*Generado por `opa discover` el 2026-08-08T17:33:52.851916+00:00.*
 
 ## Leyenda
 
