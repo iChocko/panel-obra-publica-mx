@@ -14,20 +14,21 @@ Ver [`viabilidad_tecnica`](viabilidad_tecnica) (dictamen de viabilidad) y
 [`ARQUITECTURA-panel-obra-publica-mx.md`](ARQUITECTURA-panel-obra-publica-mx.md) (arquitectura
 completa del proyecto) para el detalle.
 
-## Estado: Fase 0 + Fase 1 — Reconocimiento y resolución del hueco 2022-2026 (2026-08-08)
+## Estado: Fase 0 + Fase 1 — Reconocimiento y resolución de huecos (2026-08-08)
 
-**Recuperabilidad trimestral 2016–2024: 22 / 36 (61.1%) → por encima del 50%.**
+**Recuperabilidad trimestral 2016–2024: 28 / 36 (77.8%) → por encima del 70%.**
 
-**Recomendación: panel trimestral parcial**, con los huecos restantes documentados como *feature*
-del reporte de calidad -- no el pivote a panel anual que había recomendado la primera corrida.
-Detalle completo en [`reports/cobertura.md`](reports/cobertura.md).
+**Recomendación: panel trimestral completo, alcance original** -- no el pivote a panel anual que
+había recomendado la primera corrida, ni siquiera el panel parcial de la segunda. Detalle completo
+en [`reports/cobertura.md`](reports/cobertura.md).
 
 > **Nota de transparencia metodológica:** la corrida original de Fase 0 (2026-08-05) midió 4/36
-> (11.1%) y recomendó pivotar a panel anual. Fase 1 (2026-08-08) investigó por qué 2022-2026 no
-> respondía bajo ningún patrón conocido y encontró que el portal había renombrado los archivos
-> trimestrales, no descontinuado la sección -- esa corrección subió la cifra a 22/36. El número y
-> la recomendación **vigentes son los de arriba**; se documenta el original por trazabilidad, no
-> como estado actual.
+> (11.1%) y recomendó pivotar a panel anual. Fase 1 (2026-08-08) resolvió por qué 2022-2026 no
+> respondía (cambio de nombre de archivo, no descontinuación) y subió la cifra a 22/36 (61.1%,
+> panel parcial). Una segunda ronda de Fase 1 el mismo día resolvió además 2019 completo y 2020
+> T3/T4 vía nomenclatura irregular confirmada en el manifiesto oficial del portal, subiendo a
+> 28/36 (77.8%). El número y la recomendación **vigentes son los de arriba**; se documentan los
+> intermedios por trazabilidad, no como estado actual.
 
 Hallazgos clave:
 
@@ -44,14 +45,24 @@ Hallazgos clave:
   (`/work/models/PTP/NPTP/api/page-config/opa/row-down-opa.json`, archivado en
   `data/auxiliares/`) con sus enlaces vigentes -- útil como referencia cruzada, aunque solo cubre
   el trimestre más reciente de cada archivo, no el histórico completo.
+- **2019 completo y 2020 T3/T4 también se resolvieron, vía el mismo manifiesto oficial**, que
+  etiqueta cada URL con su trimestre en texto plano (no solo por nombre de archivo). Son 6 URLs
+  exactas con una TERCERA nomenclatura irregular, propia de esos dos años y sin patrón
+  parametrizable (`opa_trimestral.csv`, `OPASegundoTrimestre2019.csv`, `OPATercerTrimestre2019.csv`
+  -- el manifiesto trae un typo, `OPATerceTrimestre2019.csv`, que da 404 --,
+  `OPA4toTrimestre2019.csv`, y `OPA3er4toTrimestre2020.csv` que cubre T3 y T4 de 2020 en un solo
+  archivo combinado). Documentadas como `casos_especiales` en `conf/sources.yml` en vez de forzarlas
+  al mecanismo de patrones parametrizados.
 - **La hipótesis de que OPA se fusionó con el Tomo VIII del PEF es falsa.** Tomo VIII sí tiene un
   CSV real y vivo 2022-2025 (`REPORTE_TOMO_VIII.csv`), pero es presupuesto ex-ante -- sin avance
   físico, monto ejercido ni geolocalización -- nunca pudo sustituir a OPA en granularidad. Son
   complementarios, no sucesores.
-- **Los 14 trimestres que siguen como hueco (2016-2024) son reales, no un patrón sin descubrir
-  todavía:** 2016 completo, partes de 2017-2018 y 2020, y 2019 completo -- este último usa una
-  tercera nomenclatura irregular (`opa_trimestral.csv`, `OPASegundoTrimestre2019.csv`, etc.) que no
-  se mapeó en esta fase. Quedan documentados como huecos en `reports/cobertura.md`.
+- **Los 8 trimestres que siguen como hueco son reales, agotados por 4 vías independientes**
+  (manifiesto oficial, Wayback CDX dirigido por año, Common Crawl, y variaciones de nomenclatura
+  probadas en vivo): 2016 completo, 2017 T4, y 2018 T1/T2/T4. Ninguna de las 4 fuentes tiene
+  ningún registro para 2016-2018 bajo ninguna nomenclatura conocida -- el siguiente paso realista
+  es una solicitud de acceso a la información (PNT/INAI) a la SHCP, no más descubrimiento
+  automatizado. Quedan documentados como huecos en `reports/cobertura.md`.
 - **El esquema cambia de forma importante entre 2015 y 2019/2021** (45 vs. 47 columnas, `CVE_PPI`
   vs. `CVE_CARTERA`, nombres de columna casi todos distintos). 2019 y 2021 comparten esquema.
 - **`cve_cartera` no es el código numérico de 10-11 dígitos que asumía la arquitectura**: en 2019 y
@@ -84,7 +95,7 @@ Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automátic
 export UV_NO_EDITABLE=1
 uv sync
 
-# Descubrimiento: prueba ~470 URLs candidatas contra la SHCP (a 1 req/2s, ≈45-50 min
+# Descubrimiento: prueba ~480 URLs candidatas contra la SHCP (a 1 req/2s, ≈45-50 min
 # en la práctica), consulta el mirror CKAN de datos.gob.mx y la CDX API de Wayback.
 # Escribe reports/discovery.jsonl y reports/cobertura.md.
 uv run opa discover
