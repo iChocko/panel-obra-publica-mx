@@ -219,7 +219,7 @@ la arquitectura (sección 4.3): `fct_ppi_observacion` (tabla central, grano
 sobrecosto %, duración, estatus terminal inferido), `dim_snapshot`, y 3 catálogos congelados
 (`dim_ramo`, `dim_entidad`, `dim_tipo_ppi`). Vive en `data/gold/panel_opa.duckdb` (36 MB, fuera de
 git -- ver "Almacenamiento de datos pesados" en la arquitectura: Gold se empaqueta y publica
-aparte, no directo en el repo). **39 de 40 tests pasan; 1 queda en `warn` a propósito** (abajo).
+aparte, no directo en el repo). **40 de 40 tests pasan.**
 
 **El hallazgo más importante de esta fase: `(cve_cartera, snapshot_id)` -- el grano que la
 arquitectura asume como llave de la observación (sección 2.1) -- no es único en los datos crudos.**
@@ -261,8 +261,27 @@ Otros hallazgos reales de esta fase:
   arquitectura (sección 6.2) -- se probó contra datos reales y la suma de montos por ramo tiene
   demasiado ruido legítimo (medianas de 0% pero swings normales de cientos de %) para detectar
   cargas truncadas de forma confiable. Se implementó sobre **conteo de PPI por ramo** en su lugar
-  (más estable en condiciones normales), con `severity: warn` -- incluso así, con datos reales
-  quedan 5 casos que probablemente son fin de ciclo de programas grandes, no errores de carga.
+  (más estable en condiciones normales), con `severity: warn`.
+- **Hallazgo real sobre el conteo de PPI por ramo (2026-08-08): la transición Q4→Q1 de cada año
+  es un patrón estacional estructural de la fuente SHCP, no una carga truncada.** El test de
+  estabilidad por ramo marcó 5 caídas ≥70% en un mismo build; se investigaron las 5 con datos
+  reales (consulta directa a `data/gold/panel_opa.duckdb`, cada conclusión revisada por un
+  segundo agente independiente con instrucción explícita de intentar refutarla). Resultado: el
+  universo TOTAL del padrón (todos los ramos juntos, no solo los marcados) cae de forma
+  sistemática entre 15% y 29% cada enero-marzo -- verificado en 2022, 2023, 2025 y 2026 --
+  probablemente porque los proyectos plurianuales vigentes se re-registran/reautorizan
+  presupuestalmente antes de volver a aparecer en el reporte trimestral. Ninguno de los 5 casos
+  fue un archivo incompleto sin explicación: 2 fueron ese mismo patrón estacional (con parte de
+  los proyectos "desaparecidos" reapareciendo intactos 1-2 trimestres después, mismo avance
+  físico), 1 fue una reorganización administrativa real -- Entidades no Sectorizadas perdió 31
+  de 41 proyectos porque IMSS-BIENESTAR obtuvo su propio ramo presupuestal (`id_ramo=56`, nuevo
+  en 2026 T1), ya dado de alta en `dim_ramo_seed.csv` -- y 1 fue probable depuración real de
+  estudios de preinversión estancados en 0% de avance (Turismo, 2025 T1). El test
+  (`assert_conteo_ppi_por_ramo_estable.sql`) se ajustó para excluir a propósito las
+  transiciones Q4→Q1 (fuente casi exclusiva de falsos positivos ya explicados por el ciclo
+  fiscal); sigue activo para cualquier otra transición de trimestre. Esto también le da un
+  mecanismo concreto a la alta volatilidad trimestral que motivó la consideración del panel
+  anual en Fase 0 -- no es ruido aleatorio, es el ciclo de reautorización de inicio de año.
 - **Deflactación (INPC de Banxico SIE, arquitectura sección 2.3) queda sin datos reales.** La API
   de Banxico exige un token de autoservicio que no corresponde generar en automático, y no se
   encontró un endpoint público sin token con la serie completa desde 2015. `conf/deflactor_inpc.csv`
