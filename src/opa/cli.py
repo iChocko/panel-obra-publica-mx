@@ -551,5 +551,79 @@ def diccionario() -> None:
         console.print(f"  {ruta}")
 
 
+# --------------------------------------------------------------------------
+# Publicación de distribuciones (Fase B del plan de alineación ATDT -- ver
+# docs/PLAN-alineacion-gold-lineamientos-ATDT.md)
+# --------------------------------------------------------------------------
+
+DIR_PUBLISH = Path("data/publish")
+
+
+def _version_por_defecto(ruta_duckdb: Path) -> str:
+    """Deriva la versión del paquete del corte más reciente del duckdb -- mismo duckdb
+    produce siempre la misma versión por defecto (determinismo de la Fase B)."""
+    import duckdb
+
+    con = duckdb.connect(str(ruta_duckdb), read_only=True)
+    try:
+        fila = con.execute(
+            "select anio, trimestre from dim_snapshot "
+            "where trimestre is not null order by anio desc, trimestre desc limit 1"
+        ).fetchone()
+        if fila is not None:
+            anio, trimestre = fila
+            return f"{int(anio)}T{int(trimestre)}"
+        fila = con.execute(
+            "select anio from dim_snapshot where anio is not null order by anio desc limit 1"
+        ).fetchone()
+        return f"{int(fila[0])}" if fila is not None else "sin_version"
+    finally:
+        con.close()
+
+
+@app.command()
+def publish(
+    version: str = typer.Option(
+        None, help="Versión del paquete (ej. 2026T1). Por defecto: corte más reciente del duckdb."
+    ),
+) -> None:
+    """Exporta la capa Gold a CSV + Parquet + GeoJSON con checksums (Fase B, ver plan ATDT).
+
+    Determinista: mismo duckdb produce siempre los mismos bytes. Falla ruidoso (código 1)
+    si falta alguna de las 8 tablas publicables.
+    """
+    from opa import publish_geojson, publish_manifest, publish_tabular
+
+    if not RUTA_GOLD_DUCKDB.exists():
+        console.print(
+            f"[bold red]No existe {RUTA_GOLD_DUCKDB}.[/] Corre primero: "
+            "dbt build --project-dir dbt --profiles-dir dbt"
+        )
+        raise typer.Exit(code=1)
+
+    version_resuelta = version or _version_por_defecto(RUTA_GOLD_DUCKDB)
+    console.print(f"Publicando versión [bold]{version_resuelta}[/] en {DIR_PUBLISH / version_resuelta} ...")
+
+    try:
+        tabulares = publish_tabular.escribir_tabulares(RUTA_GOLD_DUCKDB, DIR_PUBLISH, version_resuelta)
+    except publish_tabular.ErrorPublicacion as exc:
+        console.print(f"[bold red]Publicación incompleta.[/] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    geojson = publish_geojson.escribir_geojson(RUTA_GOLD_DUCKDB, DIR_PUBLISH, version_resuelta)
+
+    dir_paquete = DIR_PUBLISH / version_resuelta
+    try:
+        ruta_checksums = publish_manifest.escribir_checksums(dir_paquete)
+    except publish_manifest.ErrorManifiesto as exc:
+        console.print(f"[bold red]No se pudo escribir checksums.[/] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(
+        f"\n[bold green]Publicación completa.[/] {len(tabulares)} archivos tabulares, "
+        f"{len(geojson)} GeoJSON, checksums en {ruta_checksums}"
+    )
+
+
 if __name__ == "__main__":
     app()

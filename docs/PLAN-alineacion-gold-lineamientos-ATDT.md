@@ -3,7 +3,7 @@
 **Fecha:** 2026-08-08
 **Referencia normativa:** [Acuerdo DOF 11/09/2025](normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md)
 (transcripción completa en este repo; PDF original en `docs/normativa/`).
-**Estado:** Fase A completa (2026-08-08). Fases B, C, D pendientes.
+**Estado:** Fases A y B completas (2026-08-08). Fases C, D pendientes.
 
 ---
 
@@ -65,16 +65,36 @@ para poder realinearse al Manual cuando exista sin rehacer nada a mano.
    necesitar el duckdb (no existe en CI), para atrapar el caso común de agregar una columna a
    `schema.yml` sin documentarla antes de que alguien intente generar el diccionario.
 
-### Fase B -- Exportador de distribuciones (`opa publish`)
+### Fase B -- Exportador de distribuciones (`opa publish`) -- COMPLETA (2026-08-08)
 
-1. Nuevo comando CLI `opa publish`: lee `data/gold/panel_opa.duckdb`, escribe
-   `data/publish/{version}/` con, por cada tabla publicable:
-   - `{tabla}.csv` -- UTF-8, RFC 4180. **Formato base de los Lineamientos** (Art. 38: tabular).
-   - `{tabla}.parquet` -- extra (§4).
-   - `checksums.sha256` de todo el paquete (permanencia e integridad, Art. 5-VI).
-2. GeoJSON (§4) para las tablas georreferenciadas.
-3. Idempotente y determinista: mismo duckdb → mismos bytes (mismo criterio de rerun que Bronze).
-4. `data/publish/` fuera de git, igual que bronze/silver/gold (ya cubierto por `.gitignore` de datos).
+Construida con 3 módulos independientes coordinados vía workflow multi-agente (implementación
++ revisión adversarial por módulo), integrados a mano en el CLI y verificados de punta a punta
+contra el duckdb real antes de commitear.
+
+1. ✅ `src/opa/publish_tabular.py`: lee las 8 tablas publicables, escribe
+   `{tabla}.csv` (UTF-8, **RFC 4180 con CRLF real** -- la revisión adversarial encontró que el
+   primer intento prometía RFC 4180 en el docstring pero usaba `\n` de pandas por default, se
+   corrigió) y `{tabla}.parquet`, ordenadas por una clave estable por tabla para determinismo.
+2. ✅ `src/opa/publish_geojson.py`: `fct_ppi_observacion` filtrado a coordenadas no nulas
+   (el bbox de México ya se validó en Silver, aquí no se re-valida), un `FeatureCollection`
+   RFC 7946 por año de `anio_corte` (+ `ppi_sin_anio.geojson` para el residual sin año) --
+   corrida real: 12 archivos por año 2015-2026 + 1 residual, `coordinates` en orden
+   `[longitud, latitud]` verificado, nulos como `null` real (no `NaN` ni texto).
+3. ✅ `src/opa/publish_manifest.py`: `checksums.sha256` formato `sha256sum` estándar
+   (verificable con `shasum -a 256 -c`). La revisión adversarial encontró un bug real: las
+   líneas se ordenaban por el STRING COMPLETO `"{hash}  {ruta}"`, es decir por hash primero
+   (el test original pasaba por coincidencia -- los hashes del fixture ya salían en el mismo
+   orden que las rutas); se corrigió para ordenar por ruta relativa antes de construir las
+   líneas.
+4. ✅ Comando `opa publish [--version X]` (integración manual en `cli.py`, no delegada a
+   agentes): versión por defecto derivada del corte más reciente del propio duckdb (ej.
+   `2026T1`) -- mismo duckdb siempre produce la misma versión por defecto. Corrida real
+   verificada: 30 archivos (16 tabulares + 13 GeoJSON + checksums), `shasum -a 256 -c` en
+   verde sobre los 29 archivos de datos, y una segunda corrida completa produjo bytes
+   IDÉNTICOS a la primera (`diff -rq` limpio) -- el criterio de determinismo del §5 se
+   cumple, no solo se declaró.
+5. ✅ `data/publish/` queda fuera de git (confirmado con `git status`, ya cubierto por el
+   `.gitignore` existente de `data/*`) -- mismo criterio que bronze/silver/gold.
 
 ### Fase C -- Metadatos DCAT
 

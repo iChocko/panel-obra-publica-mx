@@ -313,12 +313,23 @@ septiembre y diciembre de 2025).
 sin descripción). `opa diccionario` cruza ese schema contra las columnas REALES del duckdb y
 **falla ruidoso** (no advierte, se detiene) si aparece una columna sin descripción o una
 descripción de una columna que ya no existe -- la deriva entre documentación y datos es un
-error, igual que el resto de este pipeline. Escribe `reports/diccionario/` (fuera de git,
-regenerable): un `diccionario_datos_{tabla}.csv` por tabla y un `DICCIONARIO.md` consolidado.
+error, igual que el resto de este pipeline. Escribe `reports/diccionario/` (versionado en git,
+igual que el resto de `reports/`): un `diccionario_datos_{tabla}.csv` por tabla y un
+`DICCIONARIO.md` consolidado.
 
-Pendientes del plan: **Fase B** (`opa publish` -- CSV base + Parquet/GeoJSON como extra sobre
-lo que piden los Lineamientos), **Fase C** (catálogo DCAT) y **Fase D** (evaluación de datos
-personales + nota técnica de limitaciones empaquetada con los datos).
+**Fase B -- Exportador de distribuciones, completa.** `opa publish` escribe
+`data/publish/{version}/` (fuera de git, mismo criterio que bronze/silver/gold) con las 8
+tablas en CSV (RFC 4180, formato base que exigen los Lineamientos) y Parquet, más GeoJSON
+(RFC 7946, un `FeatureCollection` por año de corte) como el extra de este proyecto sobre las
+tablas georreferenciadas, y `checksums.sha256` verificable con `shasum -a 256 -c`. Construida
+con 3 módulos independientes vía workflow multi-agente (implementación + revisión adversarial
+por módulo, que encontró y corrigió 2 bugs reales: CSV sin CRLF pese a prometer RFC 4180, y
+checksums ordenados por hash en vez de por ruta) e integrada a mano en el CLI. Verificado
+contra el duckdb real: 30 archivos, checksums en verde, y una segunda corrida produce bytes
+**idénticos** a la primera -- el determinismo se comprobó, no se asumió.
+
+Pendientes del plan: **Fase C** (catálogo DCAT) y **Fase D** (evaluación de datos personales +
+nota técnica de limitaciones empaquetada con los datos).
 
 ## Cómo correr Fase 0 + Bronze + Silver + Gold
 
@@ -360,8 +371,13 @@ dbt build --project-dir dbt --profiles-dir dbt
 
 # Diccionario de datos (Fase A de la alineación a Lineamientos ATDT, ver arriba). Falla
 # ruidoso si hay columnas reales sin documentar en dbt/models/marts/schema.yml. Escribe
-# reports/diccionario/ (fuera de git).
+# reports/diccionario/ (versionado en git).
 uv run opa diccionario
+
+# Publicación de distribuciones (Fase B). CSV + Parquet + GeoJSON + checksums.sha256 en
+# data/publish/{version}/ (fuera de git) -- version por defecto = corte más reciente del
+# duckdb (ej. 2026T1), o pasa --version explícito.
+uv run opa publish
 ```
 
 Reportes producidos:
