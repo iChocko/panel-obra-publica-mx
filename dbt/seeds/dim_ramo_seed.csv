@@ -1,0 +1,37 @@
+id_ramo,descripcion_ramo,en_catalogo_oficial
+2,Oficina de la Presidencia de la República,False
+4,Gobernación,True
+5,Relaciones Exteriores,False
+6,Hacienda y Crédito Público,True
+7,Defensa Nacional,True
+8,Agricultura y Desarrollo Rural,True
+9,Comunicaciones y Transportes,True
+10,Economía,True
+11,Educación Pública,True
+12,Salud,True
+13,Marina,False
+14,Trabajo y Previsión Social,True
+15,"Desarrollo Agrario, Territorial y Urbano",True
+16,Medio Ambiente y Recursos Naturales,True
+17,Procuraduría General de la República,False
+18,Energía,True
+20,Bienestar,True
+21,Turismo,True
+23,Provisiones Salariales y Económicas,True
+25,"Previsiones y Aportaciones para los Sistemas de Educación Básica, Normal, Tecnológica y de Adultos",True
+27,Función Pública,True
+31,Tribunales Agrarios,False
+32,Tribunal Federal de Justicia Administrativa,False
+33,Aportaciones Federales para Entidades Federativas y Municipios,True
+35,Comisión Nacional de los Derechos Humanos,True
+36,Seguridad y Protección Ciudadana,True
+37,Consejería Jurídica del Ejecutivo Federal,False
+38,Consejo Nacional de Ciencia y Tecnología,True
+47,Entidades no Sectorizadas,True
+48,Cultura,True
+50,Instituto Mexicano del Seguro Social,False
+51,Instituto de Seguridad y Servicios Sociales de los Trabajadores del Estado,False
+52,Petróleos Mexicanos,True
+53,Comisión Federal de Electricidad,True
+55,Agencia de Transformación Digital y Telecomunicaciones,False
+56,Servicios de Salud del Instituto Mexicano del Seguro Social para el Bienestar,False

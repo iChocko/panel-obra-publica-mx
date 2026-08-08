@@ -1,0 +1,36 @@
+id_entidad_federativa,entidad_federativa,en_catalogo_oficial
+1,Aguascalientes,True
+2,Baja California,True
+3,Baja California Sur,True
+4,Campeche,True
+5,Coahuila de Zaragoza,True
+6,Colima,True
+7,Chiapas,True
+8,Chihuahua,True
+9,Ciudad de México,True
+10,Durango,True
+11,Guanajuato,True
+12,Guerrero,True
+13,Hidalgo,True
+14,Jalisco,True
+15,México,True
+16,Michoacán de Ocampo,True
+17,Morelos,True
+18,Nayarit,True
+19,Nuevo León,True
+20,Oaxaca,True
+21,Puebla,True
+22,Querétaro,True
+23,Quintana Roo,True
+24,San Luis Potosí,True
+25,Sinaloa,True
+26,Sonora,True
+27,Tabasco,True
+28,Tamaulipas,True
+29,Tlaxcala,True
+30,Veracruz de Ignacio de la Llave,True
+31,Yucatán,True
+32,Zacatecas,True
+33,EN EL EXTRANJERO,False
+34,NO DISTRIBUIBLE GEOGRAFICAMENTE,False
+35,NACIONAL,False

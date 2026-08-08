@@ -1,0 +1,180 @@
+version: 2
+
+models:
+  - name: dim_snapshot
+    description: >
+      Metadatos de cada corte -- año, trimestre, origen, procedencia, conteo de PPI, y si
+      llegó a Silver o quedó excluido (corrupto en la fuente / esquema desconocido).
+    columns:
+      - name: snapshot_id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_ramo
+    description: >
+      Catálogo de ramos presupuestarios. 25 del catálogo oficial vigente (catalogos.xlsx) +
+      11 históricos que aparecen en el panel 2015-2018 pero ya no existen en el catálogo
+      actual -- ver la nota completa en dim_ramo.sql.
+    columns:
+      - name: id_ramo
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_entidad
+    description: >
+      Catálogo de entidades federativas. 32 estados del catálogo oficial + 3 códigos
+      especiales de cobertura no-estatal (extranjero / no distribuible / nacional) que
+      aparecen en programas de cobertura nacional -- ver dim_entidad.sql.
+    columns:
+      - name: id_entidad_federativa
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_tipo_ppi
+    description: Catálogo oficial (catalogos.xlsx) de 11 tipos de programa/proyecto de inversión.
+    columns:
+      - name: id_tipo_ppi
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_ppi_observacion
+    description: >
+      Tabla central del panel (arquitectura sección 4.3). Un renglón por PPI observado en un
+      corte. Ver la nota en el modelo sobre por qué la fuente NO es directamente
+      stg_opa_snapshot -- (cve_cartera, snapshot_id) no es único en los datos crudos.
+    columns:
+      - name: cve_cartera
+        tests:
+          - not_null
+      - name: snapshot_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_snapshot')
+                field: snapshot_id
+      - name: id_ramo
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_ramo')
+                field: id_ramo
+              config:
+                where: "id_ramo is not null"
+      - name: id_entidad_federativa
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_entidad')
+                field: id_entidad_federativa
+              config:
+                where: "id_entidad_federativa is not null"
+      - name: estatus_operacion
+        description: >
+          OJO (hallazgo real, 2026-08-08): incluye variantes de texto de la misma fuente que
+          no se normalizaron en Silver (ej. "Calendario Fiscal Concluido / Operación" con
+          espacios vs. "Calendario Fiscal Concluido/Operación" sin espacios; "En Proceso de
+          Cancelación" vs. "En proceso de cancelación" con minúscula) -- pendiente de
+          unificar en una futura pasada de Silver. El test aquí fija el conjunto conocido
+          HOY para detectar valores genuinamente nuevos, no para validar que estén limpios.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - "Vigente"
+                  - "Calendario Fiscal Concluido / Operación"
+                  - "Calendario Fiscal Concluido/Operación"
+                  - "En Proceso de Modificación"
+                  - "Registrado"
+                  - "Suspendido"
+                  - "En Proceso de Cancelación"
+                  - "En proceso de cancelación"
+                  - "Ex Post"
+                  - "Cancelado"
+                  - "En Proceso de Registro APP"
+              config:
+                where: "estatus_operacion is not null"
+      - name: descripcion_tipo_ppi
+        description: >
+          OJO: texto libre de 11 años de fuente, no el catálogo oficial de 11 valores de
+          dim_tipo_ppi -- no hay un id_tipo_ppi numérico en los datos crudos que los una
+          limpiamente (ver dim_tipo_ppi.sql). 29 valores distintos observados, con
+          duplicados de forma (mayúscula/minúscula, singular/plural) sin normalizar.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - "Proyecto de Inversión de Infraestructura Económica"
+                  - "Proyecto de Inversión de Infraestructura Social"
+                  - "Proyecto de Inversión de Infraestructura Gubernamental"
+                  - "Proyecto de Inversión de Inmuebles"
+                  - "Proyectos de infraestructura"
+                  - "Otros proyectos de Inversión"
+                  - "Otros Programas de Inversión"
+                  - "Otros programas de inversión"
+                  - "Programa de Inversión de Adquisiciones"
+                  - "Programas de adquisiciones"
+                  - "Programa de Inversión de Mantenimiento"
+                  - "Programas de mantenimiento y/o rehabilitación"
+                  - "Programa de mantenimiento de protección civil"
+                  - "Programas de mantenimiento relacionados con protección civil"
+                  - "Programa de adquisición de protección civil"
+                  - "Programa de Estudios de Preinversión"
+                  - "Programa Ambiental"
+                  - "Programa ambiental"
+                  - "Infraestructura económica (PIDIREGAS)"
+                  - "Electricidad, hidrocarburos, comunicaciones y transportes, y agua."
+                  - "Funciones de desarrollo social, tales como educación, salud, seguridad social, urbanización, vivienda y asistencia social."
+                  - "Funciones de gobierno, tales como procuración de justicia, seguridad pública, seguridad nacional, y medio ambiente y recursos naturales."
+                  - "Compra de bienes como extintores, detectores de humo, etc. que no estén asociados a un proyecto de inversión"
+                  - "Compra de bienes muebles no asociados a proyectos de inversión."
+                  - "Oficinas administrativas."
+                  - "No Identificados."
+                  - "No identificados en los rubros anteriores."
+                  - "Que no impliquen un incremento en la vida útil o en la capacidad de producción de los activos."
+                  - "Según los lineamientos para el análisis costo y beneficio que entraron en vigor el 01.01.2006"
+              config:
+                where: "descripcion_tipo_ppi is not null"
+
+  - name: dim_ppi
+    description: >
+      SCD2 sobre atributos descriptivos del PPI (nombre, ramo, UR, tipo, localización,
+      coordenadas) -- un renglón por periodo de vigencia, no por observación. Los montos
+      viven en fct_ppi_observacion, no aquí.
+    columns:
+      - name: cve_cartera
+        tests:
+          - not_null
+
+  - name: fct_ppi_delta
+    description: >
+      Cambio contra el corte canónico inmediato anterior del mismo PPI. brecha_trimestres
+      distingue un delta de un trimestre limpio de uno que cruza un hueco de cobertura real.
+    columns:
+      - name: cve_cartera
+        tests:
+          - not_null
+
+  - name: fct_ppi_ciclo_vida
+    description: >
+      Un renglón por PPI: primer/último corte, sobrecosto %, duración, estatus terminal
+      inferido -- ver la limitación metodológica declarada en el modelo (sección 2.2 de la
+      arquitectura: "salida_no_explicada" puede ser un hueco de cobertura nuestro, no una
+      salida real del universo de reporte).
+    columns:
+      - name: cve_cartera
+        tests:
+          - unique
+          - not_null
+      - name: estatus_terminal_inferido
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - "terminado_probable"
+                  - "salida_no_explicada"
+                  - "vigente_ultimo_corte_disponible"

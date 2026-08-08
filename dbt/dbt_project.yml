@@ -1,0 +1,37 @@
+name: panel_opa
+version: "1.0.0"
+config-version: 2
+
+profile: panel_opa
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+macro-paths: ["macros"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+  # dbt-duckdb resuelve rutas relativas al directorio de trabajo del proceso que invoca
+  # dbt, NO al directorio del proyecto (--project-dir) ni al de profiles.yml -- confirmado
+  # empíricamente. Por eso estas rutas asumen que siempre se corre desde la raíz del repo
+  # (ver README): dbt <comando> --project-dir dbt --profiles-dir dbt
+  ruta_silver_glob: "data/silver/*.parquet"
+  ruta_manifest: "data/manifest.jsonl"
+  ruta_deflactor_inpc: "conf/deflactor_inpc.csv"
+
+models:
+  panel_opa:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: table
+
+seeds:
+  panel_opa:
+    +schema: seeds

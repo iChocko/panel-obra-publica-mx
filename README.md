@@ -210,7 +210,68 @@ reconocido se cuenta y reporta, no se adivina.
 Parquet, un archivo por snapshot, en `data/silver/` (78 MB, fuera de git igual que `data/bronze/`).
 Nombre de archivo = `snapshot_id` (ej. `2021Q3_ae02c33e.parquet`).
 
-## Cómo correr Fase 0 + Bronze + Silver
+## Gold — el panel (`dbt/`, DuckDB, 2026-08-08)
+
+`dbt build` transforma los 88 parquet de Silver en el modelo dimensional completo que describe
+la arquitectura (sección 4.3): `fct_ppi_observacion` (tabla central, grano
+`(cve_cartera, snapshot_id)`), `dim_ppi` (SCD2 sobre nombre/ramo/UR/tipo/localización/coordenadas),
+`fct_ppi_delta` (cambio contra el corte anterior), `fct_ppi_ciclo_vida` (un renglón por PPI:
+sobrecosto %, duración, estatus terminal inferido), `dim_snapshot`, y 3 catálogos congelados
+(`dim_ramo`, `dim_entidad`, `dim_tipo_ppi`). Vive en `data/gold/panel_opa.duckdb` (36 MB, fuera de
+git -- ver "Almacenamiento de datos pesados" en la arquitectura: Gold se empaqueta y publica
+aparte, no directo en el repo). **39 de 40 tests pasan; 1 queda en `warn` a propósito** (abajo).
+
+**El hallazgo más importante de esta fase: `(cve_cartera, snapshot_id)` -- el grano que la
+arquitectura asume como llave de la observación (sección 2.1) -- no es único en los datos crudos.**
+99.35% de los pares sí tienen una sola fila, pero ~1,124 pares tienen entre 2 y 33 filas para el
+mismo PPI en el mismo corte. Se investigaron dos casos reales: los montos (`MODIFICADO`,
+`EJERCIDO`) son valores genuinamente distintos entre filas del mismo grupo que suman a un total
+coherente, mientras que `avance_fisico` se repite igual en todas -- consistente con un "Programa"
+de cobertura multi-entidad exportado como una fila por sub-asignación, con un solo `cve_cartera`
+padre, no con filas repetidas por error. `int_ppi_observaciones_dedup.sql` sí resuelve esto:
+monetarios se **suman** (recupera el total real), `avance_fisico` se toma como **máximo** (es un
+porcentaje, sumarlo estaría mal), y los atributos descriptivos vienen de la sub-fila con el monto
+más grande -- lo cual pierde precisión geográfica real para un programa nacional, declarado vía
+`n_registros_agregados > 1` en vez de escondido.
+
+Otros hallazgos reales de esta fase:
+
+- **Un mismo trimestre puede tener 3 archivos complementarios, no duplicados** (Consolidado =
+  universo completo, Seguimiento = solo vigentes, Concluido = solo lo que terminó ese trimestre --
+  ver Fase 1). `int_snapshot_canonico.sql` elige uno por trimestre para los modelos que necesitan
+  orden cronológico, prefiriendo Consolidado. **2020 T1 y T2 solo tienen "Concluido" disponible**
+  -- su universo de PPI no es comparable al resto y queda marcado
+  (`cobertura_parcial_del_universo`) para no confundir un hueco de cobertura con un hallazgo real.
+- **`id_ramo` e `id_entidad_federativa` traían 11 y 3 códigos que no están en el catálogo oficial
+  vigente** (`catalogos.xlsx`) -- ramos de gobiernos anteriores ya reorganizados (ej. `13` =
+  Marina, `17` = Procuraduría General de la República) y códigos especiales de cobertura no
+  estatal (`33` = en el extranjero, `34` = no distribuible geográficamente, `35` = nacional). Las
+  descripciones se tomaron directo de la columna correspondiente del propio panel, no se
+  inventaron -- `dim_ramo`/`dim_entidad` quedaron ampliados con `en_catalogo_oficial` para
+  distinguir cuáles vienen del catálogo SHCP vigente.
+- **`estatus_operacion` y `descripcion_tipo_ppi` traen variantes de texto sin normalizar** de 11
+  años de fuente (`"Calendario Fiscal Concluido / Operación"` vs. `"...Concluido/Operación"` sin
+  espacios; `"En Proceso de Cancelación"` vs. `"En proceso de cancelación"`) -- 11 y 29 valores
+  distintos respectivamente. No hay un `id_tipo_ppi` numérico en los datos crudos que una
+  limpiamente contra el catálogo oficial de 11 valores. Los tests `accepted_values` fijan el
+  conjunto conocido hoy (para detectar valores *nuevos*, no para certificar que estén limpios) --
+  normalizar esto es trabajo pendiente, declarado, no una limpieza de Silver que ya se hizo.
+- **El test de "coherencia de montos" del dictamen original (`ejercido <= modificado * 1.05`)
+  tampoco se pudo usar aquí** para el singular de "estabilidad por ramo y corte" que pide la
+  arquitectura (sección 6.2) -- se probó contra datos reales y la suma de montos por ramo tiene
+  demasiado ruido legítimo (medianas de 0% pero swings normales de cientos de %) para detectar
+  cargas truncadas de forma confiable. Se implementó sobre **conteo de PPI por ramo** en su lugar
+  (más estable en condiciones normales), con `severity: warn` -- incluso así, con datos reales
+  quedan 5 casos que probablemente son fin de ciclo de programas grandes, no errores de carga.
+- **Deflactación (INPC de Banxico SIE, arquitectura sección 2.3) queda sin datos reales.** La API
+  de Banxico exige un token de autoservicio que no corresponde generar en automático, y no se
+  encontró un endpoint público sin token con la serie completa desde 2015. `conf/deflactor_inpc.csv`
+  tiene el esquema correcto (columnas `anio, trimestre, inpc, anio_base`) pero vacío --
+  `modificado_real`/`ejercido_real`/`monto_total_inversion_real` en `fct_ppi_observacion` existen
+  y funcionan, simplemente salen `NULL` hasta que alguien con acceso a un token de Banxico SIE
+  llene el CSV con la serie oficial. No se aproximó con un supuesto de inflación genérico.
+
+## Cómo correr Fase 0 + Bronze + Silver + Gold
 
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
 
@@ -242,6 +303,11 @@ uv run opa bronze
 # reports/calidad_silver.md. Sale con código 1 si aparece un esquema no mapeado o un
 # error de lectura (falla ruidoso a propósito, ver ARQUITECTURA sección 5.3).
 uv run opa normalize
+
+# Gold: seeds + modelos dbt + tests, todo en un solo comando. Escribe
+# data/gold/panel_opa.duckdb (fuera de git). --project-dir y --profiles-dir son
+# necesarios porque dbt/ no es la raíz del repo.
+dbt build --project-dir dbt --profiles-dir dbt
 ```
 
 Reportes producidos:
@@ -253,16 +319,19 @@ Reportes producidos:
 | `reports/esquemas.md` | Comparación de columnas y calidad entre las 3 muestras descargadas |
 | `data/manifest.jsonl` | Un renglón por snapshot bronze: url, origen, sha256, corte declarado, header_hash |
 | `reports/calidad_silver.md` | Un renglón por snapshot normalizado: filas válidas/rechazadas y por qué |
+| `data/gold/panel_opa.duckdb` | Base DuckDB con el modelo dimensional completo -- consultable con cualquier cliente SQL de DuckDB |
 
-## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze + Silver)
+## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze + Silver + Gold)
 
-Reconocimiento completo (inventario de URLs, matriz de cobertura, inspección de esquemas), la
-ingesta de Bronze (todos los snapshots recuperables descargados completos, hasheados y con
-procedencia documentada), y Silver completo: `conf/schema_map.yml` (11 esquemas reales
-mapeados), `src/opa/contracts.py` (contrato Pandera corregido con evidencia real) y
-`src/opa/normalize.py` (bronze → parquet canónico, 98.9% de las filas reales validadas). **No hay
-modelos Gold todavía** -- dbt, SCD2 sobre `dim_ppi`, y las fases siguientes descritas en el
-documento de arquitectura quedan pendientes de una sesión futura.
+Reconocimiento completo (inventario de URLs, matriz de cobertura, inspección de esquemas), Bronze
+(todos los snapshots recuperables descargados completos, hasheados y con procedencia
+documentada), Silver (`conf/schema_map.yml`, `src/opa/contracts.py`, `src/opa/normalize.py` --
+98.9% de las filas reales validadas), y Gold (`dbt/`: `fct_ppi_observacion`, `dim_ppi` SCD2,
+`fct_ppi_delta`, `fct_ppi_ciclo_vida`, catálogos, 39/40 tests). **Pendiente para una sesión
+futura:** la serie real de INPC de Banxico SIE para deflactación (requiere un token que no
+corresponde generar en automático -- ver la sección de Gold arriba), normalizar las variantes de
+texto de `estatus_operacion`/`descripcion_tipo_ppi`, y la capa de publicación (MkDocs,
+DuckDB-WASM, servidor MCP, Zenodo/Hugging Face) descrita en la arquitectura.
 
 ## Licencia
 

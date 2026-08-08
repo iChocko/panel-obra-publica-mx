@@ -12,6 +12,13 @@ data/*
 !data/muestras/
 !data/manifest.jsonl
 
+# dbt: artefactos de build, nunca fuente de verdad -- ver ARQUITECTURA sección 7
+# ("Gold empaquetado -> GitHub Releases + Hugging Face", no directo en git)
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml
+
 # Config local de Claude Code
 .claude/settings.local.json
 

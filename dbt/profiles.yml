@@ -1,0 +1,10 @@
+# DuckDB es un motor embebido -- no hay credenciales que proteger, por eso este archivo
+# vive en el repo en vez de en ~/.dbt/ (arquitectura sección 13: "sin infraestructura").
+# Correr siempre con: dbt <comando> --project-dir dbt --profiles-dir dbt (desde la raíz).
+panel_opa:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "data/gold/panel_opa.duckdb"  # relativo al directorio desde donde se invoca dbt (raíz del repo)
+      threads: 4
