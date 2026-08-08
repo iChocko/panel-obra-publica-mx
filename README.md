@@ -120,9 +120,12 @@ matriz de cobertura con números reales, e inspección de esquemas de muestra. *
 ingesta, normalización ni modelos todavía** — eso corresponde a Bronze y las fases siguientes,
 descritas en el documento de arquitectura.
 
-## Licencia de los datos
+## Licencia
 
-Los datos de OPA están sujetos a los **Términos de Libre Uso MX** (datos.gob.mx/libreusomx) bajo
-el "Decreto por el que se establece la regulación en materia de Datos Abiertos" (DOF 20/02/2015).
-Toda redistribución debe citar: nombre del conjunto de datos, siglas de la dependencia (SHCP),
-liga de los datos descargados y fecha de consulta en formato `AAAA-MM-DD`.
+El código de este repositorio está bajo licencia [MIT](LICENSE).
+
+Los **datos** de OPA son un conjunto separado, sujeto a los **Términos de Libre Uso MX**
+(datos.gob.mx/libreusomx) bajo el "Decreto por el que se establece la regulación en materia de
+Datos Abiertos" (DOF 20/02/2015). Toda redistribución debe citar: nombre del conjunto de datos,
+siglas de la dependencia (SHCP), liga de los datos descargados y fecha de consulta en formato
+`AAAA-MM-DD`.
