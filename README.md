@@ -122,6 +122,73 @@ los Términos de Libre Uso MX (liga + fecha de descarga). Cualquiera puede repro
 completo corriendo `uv run opa bronze` -- vuelve a descargar los mismos bytes (mismo hash) de las
 mismas URLs que ya están documentadas en `reports/discovery.jsonl`.
 
+**Un hallazgo de calidad de datos real, encontrado al inspeccionar los archivos ya archivados:**
+los 3 productos de **2024 T1** (`ConsolidadoOPA1erTrimestre2024.csv`,
+`SeguimientoOPA1erTrimestre2024.csv`, `ConcluidosOPA1erTrimestre2024.csv`) están **corruptos en
+la fuente misma** -- el servidor sirve un binario OLE2 (firma de Excel `.xls` antiguo) con
+extensión `.csv` y `Content-Type: text/csv`, truncado (`xlrd` confirma que el stream interno
+declara más bytes de los que el archivo realmente tiene). El `Content-Length` del servidor
+coincide exactamente con lo descargado -- no es un problema de nuestra descarga -- y no hay
+captura alterna en Wayback. Discovery (Fase 0/1) no lo detecta porque solo valida status HTTP y
+Content-Type, no contenido; por eso 2024 T1 sigue contando como "vivo" en `reports/cobertura.md`.
+Bronze lo preservó tal cual (es evidencia, no se borra) y `conf/schema_map.yml` lo marca
+explícitamente en `snapshots_conocidos_corruptos` para que Silver lo rechace ruidosamente en vez
+de intentar normalizarlo.
+
+## Silver — schema_map.yml y el contrato Pandera de cve_cartera (2026-08-08)
+
+**El desorden histórico que la arquitectura anticipaba (sección 4.2: "aquí es donde vive el
+trabajo real y donde aparecerán las sorpresas") resultó ser más desordenado de lo que la muestra
+de 3 archivos de Fase 0 alcanzaba a mostrar.** Inspeccionando columna por columna los 128
+archivos bronze reales (no una muestra), aparecieron **11 esquemas distintos**, no 2:
+
+- **2019-2026 es un esquema único y estable** (79 de 128 archivos, sin cambios en 7 años) --
+  buena noticia, es lo que van a seguir usando todos los cortes futuros.
+- **2015-2018 tiene 9 variantes reales**, no una sola "forma vieja": la nomenclatura de columnas
+  cambia varias veces dentro del mismo año (`RAMO` vs `ID_RAMO`, con y sin `CICLO`), hay columnas
+  que aparecen y desaparecen según el corte (`MODIFICADO`/`EJERCIDO`/`AVANCE_FISICO` faltan por
+  completo en un snapshot de 2016 -- no es un null, la columna no existía todavía), y **dos bugs
+  reales de la fuente**: el anual de 2018 tiene una columna llamada `CVE_PPI` dos veces (donde la
+  segunda debería decir `NOMBRE`), y uno de los snapshots de 2016 repite `RAMO` donde debería
+  decir `DESC_RAMO`. `conf/schema_map.yml` documenta cada variante con su `header_hash`, el
+  mapeo columna por columna a nombres canónicos, y marca con `[inferido]` los mapeos que son
+  un juicio semántico razonado, no una confirmación oficial de la SHCP.
+
+**El contrato Pandera original del dictamen de viabilidad tenía tres supuestos que no
+sobrevivieron el contacto con datos reales** (`src/opa/contracts.py`, `OPASnapshot`):
+
+- `cve_cartera` **no es un numérico de 10-11 dígitos** (dictamen original: `^\d{10,11}$`, 0% de
+  cumplimiento ya confirmado desde Fase 0). Es **alfanumérico de 10-11 caracteres** una vez que
+  se quita una comilla inicial que trae el propio archivo (artefacto de Excel "forzar texto",
+  presente 2016-2026 pero no en 2015) -- confirmado sobre 32,186 valores reales, ~99.2% de
+  cumplimiento con `^[0-9A-Z]{10,11}$`. El ~0.8% restante es basura real de la fuente que el
+  contrato rechaza a propósito: valores centinela tipo `'020 96 020'` (se repiten idénticos entre
+  años, no son proyectos reales) y notación científica corrupta tipo `'8.36E+21'` (autocast de
+  Excel, dato irrecuperable).
+- `anio` **no siempre está presente incluso en el esquema moderno** -- ~20% de las filas lo traen
+  vacío (368/1786 verificado sobre un snapshot real de 2021), contra el supuesto original de que
+  siempre está poblado. `ciclo` suele tener valor cuando `anio` no lo tiene, pero no son
+  intercambiables sin más.
+- El *check* de coherencia `ejercido <= modificado * 1.05` del dictamen original **falla en 18.5%
+  de las filas reales** (278/1499 en un snapshot de 2021), varias por márgenes de cientos de veces,
+  no de redondeo -- probable mezcla de un campo acumulado desde el inicio del proyecto
+  (`EJERCIDO`) contra uno del ciclo vigente (`MODIFICADO`). **No se incluyó ese check en el
+  contrato**: comparar directo puede no tener sentido semántico, y forzar la tolerancia solo para
+  que pase ocultaría el problema real en vez de resolverlo. Queda documentado como pregunta
+  abierta para Fase 3, no adivinado.
+
+`latitud`/`longitud` sí necesitaban el bbox de México del dictamen original (confirmado: hay
+valores basura reales, latitud hasta 436117.0) y `monto_total_inversion >= 0` se mantiene sin
+cambios (el máximo real, ~1.7 billones de pesos, es consistente con un megaproyecto agregado, no
+un error de unidades).
+
+Probado de punta a punta contra un archivo bronze real completo (2021, 1786 filas): el contrato
+detecta correctamente los 13 valores `cve_cartera` centinela y 11 puntos fuera del bbox, sin
+falsos positivos en el resto.
+
+**No incluye `normalize.py` todavía** -- `schema_map.yml` y `contracts.py` son el contrato de
+entrada a Silver, no la transformación bronze → parquet en sí. Eso es el siguiente paso de Fase 2.
+
 ## Cómo correr Fase 0 + Bronze
 
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
@@ -159,14 +226,15 @@ Reportes producidos:
 | `reports/esquemas.md` | Comparación de columnas y calidad entre las 3 muestras descargadas |
 | `data/manifest.jsonl` | Un renglón por snapshot bronze: url, origen, sha256, corte declarado, header_hash |
 
-## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze)
+## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze + inicio de Silver)
 
-Reconocimiento completo (inventario de URLs, matriz de cobertura, inspección de esquemas) y la
-ingesta de Bronze: todos los snapshots recuperables descargados completos, hasheados y con
-procedencia documentada. **No hay normalización ni modelos todavía** (Silver/Gold) -- eso
-corresponde a las fases siguientes, descritas en el documento de arquitectura. El contrato
-Pandera de `cve_cartera` y el mapeo de esquemas entre 2015 y 2019/2021 siguen pendientes de
-Fase 2, con datos reales ya archivados para trabajar sobre ellos.
+Reconocimiento completo (inventario de URLs, matriz de cobertura, inspección de esquemas), la
+ingesta de Bronze (todos los snapshots recuperables descargados completos, hasheados y con
+procedencia documentada), y el arranque de Silver: `conf/schema_map.yml` (11 esquemas reales
+mapeados) y `src/opa/contracts.py` (contrato Pandera corregido con evidencia real). **No hay
+`normalize.py` ni modelos Gold todavía** -- la transformación bronze → parquet canónico y las
+fases siguientes están descritas en el documento de arquitectura, pendientes de una sesión
+futura.
 
 ## Licencia
 

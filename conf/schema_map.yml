@@ -1,0 +1,731 @@
+# schema_map.yml -- mapeo explícito y auditable de columnas históricas a nombres canónicos.
+# Ver ARQUITECTURA-panel-obra-publica-mx.md secciones 4.2 y 5.3.
+#
+# Cada entrada de "esquemas" está indexada por header_hash -- el hash del conjunto de columnas
+# crudas de un snapshot, calculado por src/opa/manifest.py:calcular_header_hash() y ya
+# registrado por snapshot en data/manifest.jsonl. Un header_hash que NO aparece aquí es un
+# esquema nuevo no visto: el pipeline (normalize.py, todavía no escrito) debe fallar
+# ruidosamente, no adivinar el mapeo -- ver la regla de la sección 5.3.
+#
+# Construido en Fase 2 (2026-08-08) inspeccionando columna por columna los 128 archivos
+# bronze reales archivados en Fase 1 -- no la muestra de 3 archivos de Fase 0. Se encontraron
+# 11 esquemas reales distintos (más 3 snapshots corruptos en la fuente, ver el bloque final).
+#
+# Convención de confianza en cada mapeo de columna:
+#   (sin marca)  -- coincide de nombre o de posición con la columna moderna equivalente.
+#   [inferido]   -- coincidencia semántica razonada pero no confirmada contra documentación
+#                   oficial de la SHCP. Revisar antes de usar en un cálculo que dependa de ello.
+#   [bug_fuente] -- la fuente reutilizó un nombre de columna ya usado (pandas le agrega ".1"
+#                   al leerlo) o etiquetó mal una columna. El mapeo corrige la posición real,
+#                   no el nombre literal que trae el archivo.
+
+columnas_canonicas:
+  # Núcleo compartido por (casi) todos los esquemas -- lo que necesita fct_ppi_observacion.
+  cve_cartera: "Clave de cartera del PPI. Antes de 2019 la columna se llama CVE_PPI. Grano del panel."
+  nombre_ppi: "Nombre del programa/proyecto de inversión."
+  id_ramo: "Código del ramo presupuestario."
+  descripcion_ramo: "Nombre del ramo presupuestario."
+  id_ur: "Código de la unidad responsable."
+  descripcion_ur: "Nombre de la unidad responsable."
+  descripcion_tipo_ppi: "Tipo de PPI (categoría)."
+  descripcion_ppi: "Descripción larga del proyecto."
+  localizacion: "Localización textual libre."
+  id_entidad_federativa: "Clave de entidad federativa (INEGI)."
+  entidad_federativa: "Nombre de la entidad federativa."
+  latitud: "Latitud del proyecto."
+  longitud: "Longitud del proyecto."
+  fecha_inicio_cal_ff: "Fecha de inicio (calendario físico-financiero)."
+  fecha_fin_cal_ff: "Fecha de fin (calendario físico-financiero)."
+  anios_he: "Años de horizonte de ejecución declarados."
+  nombre_admin: "Nombre del responsable administrativo del PPI."
+  apellido_paterno_admin: "Apellido paterno del responsable."
+  apellido_materno_admin: "Apellido materno del responsable."
+  cargo_admin: "Cargo del responsable."
+  mail_admin: "Correo del responsable."
+  mail_alterno_admin: "Correo alterno del responsable (solo esquema moderno)."
+  telefono_admin: "Teléfono del responsable."
+  extension_admin: "Extensión telefónica (solo esquema moderno)."
+  meta_fisica: "Meta física declarada, texto libre."
+  beneficios_esperados: "Beneficios esperados, texto libre."
+  id_ppi: "Identificador interno del PPI (no confundir con cve_cartera)."
+  ppef: "Monto en el Proyecto de Presupuesto de Egresos de la Federación."
+  pef: "Monto en el Presupuesto de Egresos de la Federación aprobado."
+  aprobado: "Monto aprobado."
+  modificado: "Monto modificado (presupuesto vigente)."
+  ejercido: "Monto ejercido."
+  avance_fisico: "Porcentaje de avance físico declarado."
+  monto_total_inversion: "Monto total de inversión del PPI."
+  monto_operacion_mantenimiento: "Monto de operación y mantenimiento (solo esquema moderno)."
+  otros_costos: "Otros costos (solo esquema moderno)."
+  costo_total_inversion: "Costo total de inversión. En el esquema viejo es COSTO_TOTAL_PPI."
+  anio: "Año declarado por el proyecto -- OJO: ~20% de filas lo traen vacío incluso en el
+    esquema moderno (verificado en Fase 2 sobre datos reales); no asumir siempre presente.
+    ciclo suele estar poblado cuando anio no lo está."
+  fiscal: "Fuente de recursos: fiscal (solo esquema moderno)."
+  propio: "Fuente de recursos: propios (solo esquema moderno)."
+  estatal: "Fuente de recursos: estatales. Antes de 2019 es RECURSOS_ESTATALES."
+  municipal: "Fuente de recursos: municipales. Antes de 2019 es RECURSOS_MUNICIPALES."
+  privada: "Fuente de recursos: privados. Antes de 2019 es RECURSOS_PRIVADOS/PRIVADOS."
+  fideicomiso: "Fuente de recursos: fideicomiso."
+  otros: "Fuente de recursos: otros (solo esquema moderno)."
+  ciclo: "Ciclo/ejercicio fiscal del corte. Más completo que anio en la práctica."
+  estatus_operacion: "Estatus del PPI (vigente/concluido/suspendido/...). Solo esquema moderno;
+    el esquema viejo usa fase con un vocabulario distinto, sin normalizar todavía."
+
+  # Solo en el esquema viejo (2015-2018, CVE_PPI) -- sin equivalente directo en el moderno.
+  fecha_inicio_cal_fiscal: "Fecha de inicio, calendario fiscal (distinta de fecha_inicio_cal_ff)."
+  fecha_fin_cal_fiscal: "Fecha de fin, calendario fiscal."
+  grupo_funcional: "Clasificación funcional del gasto (grupo)."
+  funcion: "Clasificación funcional del gasto (función)."
+  total_gasto_operacion_he: "Gasto de operación en el horizonte de ejecución."
+  total_gasto_no_considerado: "Gasto no considerado en el costo total."
+  monto_asignacion_actual: "Monto de asignación actual (visto solo en 2015)."
+  aprobado_pef_2017: "Monto aprobado en el PEF 2017 (columna de un solo ejercicio, vista en
+    snapshots de 2016-2017; no es un campo recurrente, es un artefacto de esa publicación)."
+  calendario_fiscal_del_ciclo: "Calendario fiscal del ciclo (codificado, sin decodificar)."
+  clasificacion_ciudadana: "Clave de clasificación ciudadana del gasto (visto solo en 2016)."
+  descripcion_clasificacion_ciudadana: "Descripción de la clasificación ciudadana (2016-2018)."
+  tipo_proyecto: "Tipo de proyecto, texto libre (visto en 2015 y algunos snapshots de 2016)."
+  fase: "Fase del PPI en el esquema viejo/transicional (2017-2018) -- vocabulario distinto a
+    estatus_operacion del esquema moderno, sin normalizar/unificar todavía (Fase 3)."
+
+esquemas:
+  # ------------------------------------------------------------------------------------
+  # Esquema moderno estable -- 2019 a 2026, 79 de 128 archivos bronze (el más importante:
+  # es el que van a seguir usando todos los cortes futuros).
+  # ------------------------------------------------------------------------------------
+  0aca18bb5391629246b59b6babb92e16ce67c698890ecac2ab26dc8f44f7215f:
+    periodo: "2019-2026 (estable, sin cambios en 79 snapshots distintos)"
+    n_columnas: 47
+    columnas:
+      CVE_CARTERA: cve_cartera
+      NOMBRE_PPI: nombre_ppi
+      ID_RAMO: id_ramo
+      DESCRIPCION_RAMO: descripcion_ramo
+      ID_UR: id_ur
+      DESCRIPCION_UR: descripcion_ur
+      DESCRIPCION_TIPO_PPI: descripcion_tipo_ppi
+      DESCRIPCION_PPI: descripcion_ppi
+      LOCALIZACION: localizacion
+      ID_ENTIDAD_FEDERATIVA: id_entidad_federativa
+      ENTIDAD_FEDERATIVA: entidad_federativa
+      LATITUD: latitud
+      LONGITUD: longitud
+      FECHA_INICIO_CAL_FF: fecha_inicio_cal_ff
+      FECHA_FIN_CAL_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      APELLIDO_PATERNO_ADMIN: apellido_paterno_admin
+      APELLIDO_MATERNO_ADMIN: apellido_materno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      MAIL_ALTERNO_ADMIN: mail_alterno_admin
+      TELEFONO_ADMIN: telefono_admin
+      EXTENSION_ADMIN: extension_admin
+      META_FISICA: meta_fisica
+      BENEFICIOS_ESPERADOS: beneficios_esperados
+      ID_PPI: id_ppi
+      PPEF: ppef
+      PEF: pef
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      MONTO_OPERACION_MANTENIMIENTO: monto_operacion_mantenimiento
+      OTROS_COSTOS: otros_costos
+      COSTO_TOTAL_INVERSION: costo_total_inversion
+      ANIO: anio
+      FISCAL: fiscal
+      PROPIO: propio
+      ESTATAL: estatal
+      MUNICIPAL: municipal
+      PRIVADA: privada
+      FIDEICOMISO: fideicomiso
+      OTROS: otros
+      CICLO: ciclo
+      ESTATUS_OPERACION: estatus_operacion
+
+  # ------------------------------------------------------------------------------------
+  # 2018 T3 -- transicional: ya usa nombres de columna nuevos (CVE_CARTERA, NOMBRE_PPI)
+  # pero con 3 nombres que todavía no se estabilizan a la forma moderna.
+  # ------------------------------------------------------------------------------------
+  634ab3b230e1ed3050d82ffe7df2ff8600ec3fc097f3bbbc2ec3e93812651c1d:
+    periodo: "2018 T3 (transicional, ya con nomenclatura nueva)"
+    n_columnas: 47
+    notas:
+      - "LATITUD_FINAL/LONGITUD_FINAL en vez de LATITUD/LONGITUD -- se mapean igual [inferido]."
+      - "ANIOS_OPERACION en vez de ANIOS_HE -- se mapea igual [inferido]."
+      - "FASE en vez de CICLO/ESTATUS_OPERACION -- NO se mapea a ninguno de los dos, columna
+        propia (ver fase en columnas_canonicas). No confundir con el ESTATUS_OPERACION del
+        esquema moderno: vocabulario distinto, sin normalizar."
+    columnas:
+      CVE_CARTERA: cve_cartera
+      NOMBRE_PPI: nombre_ppi
+      ID_RAMO: id_ramo
+      DESCRIPCION_RAMO: descripcion_ramo
+      ID_UR: id_ur
+      DESCRIPCION_UR: descripcion_ur
+      DESCRIPCION_TIPO_PPI: descripcion_tipo_ppi
+      DESCRIPCION_PPI: descripcion_ppi
+      LOCALIZACION: localizacion
+      ID_ENTIDAD_FEDERATIVA: id_entidad_federativa
+      ENTIDAD_FEDERATIVA: entidad_federativa
+      LATITUD_FINAL: latitud
+      LONGITUD_FINAL: longitud
+      FECHA_INICIO_CAL_FF: fecha_inicio_cal_ff
+      FECHA_FIN_CAL_FF: fecha_fin_cal_ff
+      ANIOS_OPERACION: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      APELLIDO_PATERNO_ADMIN: apellido_paterno_admin
+      APELLIDO_MATERNO_ADMIN: apellido_materno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      MAIL_ALTERNO_ADMIN: mail_alterno_admin
+      TELEFONO_ADMIN: telefono_admin
+      EXTENSION_ADMIN: extension_admin
+      META_FISICA: meta_fisica
+      BENEFICIOS_ESPERADOS: beneficios_esperados
+      ID_PPI: id_ppi
+      PPEF: ppef
+      PEF: pef
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      MONTO_OPERACION_MANTENIMIENTO: monto_operacion_mantenimiento
+      OTROS_COSTOS: otros_costos
+      COSTO_TOTAL_INVERSION: costo_total_inversion
+      ANIO: anio
+      FISCAL: fiscal
+      PROPIO: propio
+      ESTATAL: estatal
+      MUNICIPAL: municipal
+      PRIVADA: privada
+      FIDEICOMISO: fideicomiso
+      OTROS: otros
+      FASE: fase
+      ESTATUS_OPERACION: estatus_operacion
+
+  # ------------------------------------------------------------------------------------
+  # 2018 anual -- esquema viejo (CVE_PPI), con un bug real de la fuente: la segunda
+  # columna se llama "CVE_PPI" otra vez en vez de "NOMBRE" (pandas la lee como CVE_PPI.1).
+  # ------------------------------------------------------------------------------------
+  9a202c5392b1bff0e05da5ce1b42b30c022df8d6bbcdd2aa51b946f6322e7d06:
+    periodo: "2018 anual"
+    n_columnas: 47
+    notas:
+      - "[bug_fuente] La columna 2 del CSV crudo se llama literalmente 'CVE_PPI' otra vez
+        (debería decir NOMBRE, a juzgar por su posición idéntica en todos los demás
+        esquemas). pandas la renombra CVE_PPI.1 al leerla. Se mapea a nombre_ppi, no a un
+        segundo cve_cartera -- confirmar con una muestra de valores antes de confiar en
+        esto a ciegas en normalize.py."
+    columnas:
+      CVE_PPI: cve_cartera
+      CVE_PPI.1: nombre_ppi  # bug_fuente, ver nota arriba
+      ID_RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      ID_UR: id_ur
+      DESC_UR: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi  # [inferido]
+      DESC_PPI: descripcion_ppi
+      LOCALIZACION: localizacion
+      ID_ENTIDAD_FEDERATIVA: id_entidad_federativa
+      ENTIDAD_FEDERATIVA: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff  # [inferido] -- ver nota en columnas_canonicas
+      FECHA_FIN_FF: fecha_fin_cal_ff  # [inferido]
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      MONTO_PPEF: ppef  # [inferido]
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion  # [inferido]
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CICLO: ciclo
+      DESC_CLAS_CIUDADANA: descripcion_clasificacion_ciudadana
+      FASE: fase
+
+  # ------------------------------------------------------------------------------------
+  # 2017 anual -- MONTO_PPEF + FASE, sin CICLO.
+  # ------------------------------------------------------------------------------------
+  661ef364695f177596c27085cede5a9407e8c3c9ff9b2ef9701b635ebd7a8029:
+    periodo: "2017 anual"
+    n_columnas: 46
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      ID_RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      ID_UR: id_ur
+      DESC_UR: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi  # [inferido]
+      DESC_PPI: descripcion_ppi
+      LOCALIZACION: localizacion
+      ID_ENTIDAD_FEDERATIVA: id_entidad_federativa
+      ENTIDAD_FEDERATIVA: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff  # [inferido]
+      FECHA_FIN_FF: fecha_fin_cal_ff  # [inferido]
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      MONTO_PPEF: ppef  # [inferido]
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion  # [inferido]
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CICLO: ciclo
+      FASE: fase
+
+  # ------------------------------------------------------------------------------------
+  # 2017 T1 -- idéntico al anual de arriba pero sin MONTO_PPEF.
+  # ------------------------------------------------------------------------------------
+  170951e1ed7ca96b50d920ffa45515a790c9dab8c6c4c89122fa12cb6582f0e4:
+    periodo: "2017 T1"
+    n_columnas: 45
+    notas:
+      - "Mismo esquema que el 2017 anual (661ef36469...) menos MONTO_PPEF -- ver ese bloque
+        para el detalle de cada mapeo [inferido]."
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      ID_RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      ID_UR: id_ur
+      DESC_UR: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi
+      DESC_PPI: descripcion_ppi
+      LOCALIZACION: localizacion
+      ID_ENTIDAD_FEDERATIVA: id_entidad_federativa
+      ENTIDAD_FEDERATIVA: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff
+      FECHA_FIN_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CICLO: ciclo
+      FASE: fase
+
+  # ------------------------------------------------------------------------------------
+  # 2017 anual (variante B) -- APROBADO_PEF_2017 + DESC_CLAS_CIUDADANA en vez de
+  # MONTO_PPEF + FASE. Publicación distinta dentro del mismo año.
+  # ------------------------------------------------------------------------------------
+  236ca9a0f2c762be6833ac8eb204344fd04379e6b217da4b4855599c20ef4ce8:
+    periodo: "2017 anual (variante B, misma fecha de publicación que la variante A pero
+      con columnas distintas -- la fuente publicó dos formatos distintos ese año)"
+    n_columnas: 46
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      ID_RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      ID_UR: id_ur
+      DESC_UR: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi
+      DESC_PPI: descripcion_ppi
+      LOCALIZACION: localizacion
+      ID_ENTIDAD_FEDERATIVA: id_entidad_federativa
+      ENTIDAD_FEDERATIVA: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff
+      FECHA_FIN_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      APROBADO_PEF_2017: aprobado_pef_2017
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CICLO: ciclo
+      DESC_CLAS_CIUDADANA: descripcion_clasificacion_ciudadana
+
+  # ------------------------------------------------------------------------------------
+  # 2016, variante A -- nomenclatura ID_RAMO/ID_UR ya adelantada, sin CICLO ni TIPO_PROYECTO.
+  # ------------------------------------------------------------------------------------
+  937e5f8f892815f357f4dc96753c34432665543c8e66c3a0db41e1e9d5d71b85:
+    periodo: "2016 (variante A)"
+    n_columnas: 44
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      ID_RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      ID_UR: id_ur
+      DESC_UR: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi
+      DESC_PPI: descripcion_ppi
+      LOCALIZACION: localizacion
+      ID_ENTIDAD_FEDERATIVA: id_entidad_federativa
+      ENTIDAD_FEDERATIVA: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff
+      FECHA_FIN_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      APROBADO_PEF_2017: aprobado_pef_2017
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+
+  # ------------------------------------------------------------------------------------
+  # 2016, variante B -- nomenclatura RAMO/UNIDAD vieja (no ID_RAMO/ID_UR), con CICLO y
+  # CLASIFICACION_CIUDADANA.
+  # ------------------------------------------------------------------------------------
+  1b0cf61250040039c92e31a9173f4403dde8cc232571d2111c1b79c940a51722:
+    periodo: "2016 (variante B)"
+    n_columnas: 45
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      UNIDAD: id_ur
+      DESC_UNIDAD: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi
+      DESCRIPCION: descripcion_ppi
+      LOCALIZACION: localizacion
+      CVE_ENTFED: id_entidad_federativa
+      ENT_FED: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff
+      FECHA_FIN_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CLASIFICACION_CIUDADANA: clasificacion_ciudadana
+      CICLO: ciclo
+
+  # ------------------------------------------------------------------------------------
+  # 2016, variante C -- reducida: sin MODIFICADO/EJERCIDO/AVANCE_FISICO (no ausencia de
+  # dato, ausencia de la COLUMNA -- ese corte no traía seguimiento de ejecución todavía).
+  # ------------------------------------------------------------------------------------
+  33ed4b781e30838158f1b2a7f3cc8b380de367cea2508ecf3b159498b836efe3:
+    periodo: "2016 (variante C, sin columnas de seguimiento de ejecución)"
+    n_columnas: 42
+    notas:
+      - "MODIFICADO, EJERCIDO y AVANCE_FISICO no existen en este snapshot -- no llenar con
+        null en normalize.py como si fueran opcionales del esquema moderno: literalmente no
+        se publicaron para este corte."
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      UNIDAD: id_ur
+      DESC_UNIDAD: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi
+      DESCRIPCION: descripcion_ppi
+      LOCALIZACION: localizacion
+      CVE_ENTFED: id_entidad_federativa
+      ENT_FED: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff
+      FECHA_FIN_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      APROBADO: aprobado
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CICLO: ciclo
+      TIPO_PROYECTO: tipo_proyecto
+
+  # ------------------------------------------------------------------------------------
+  # 2016, variante D -- bug de fuente: RAMO repetido (pandas lo lee como RAMO.1) donde
+  # debería decir DESC_RAMO.
+  # ------------------------------------------------------------------------------------
+  29a93369424ae5e4de1127c4af541809daf04ad304a3941c867a90dd416177cf:
+    periodo: "2016 (variante D)"
+    n_columnas: 45
+    notas:
+      - "[bug_fuente] La columna 4 del CSV crudo se llama literalmente 'RAMO' otra vez
+        (debería decir DESC_RAMO, a juzgar por su posición). pandas la renombra RAMO.1."
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      RAMO: id_ramo
+      RAMO.1: descripcion_ramo  # bug_fuente, ver nota arriba
+      UNIDAD: id_ur
+      DESC_UNIDAD: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi
+      DESCRIPCION: descripcion_ppi
+      LOCALIZACION: localizacion
+      CVE_ENTFED: id_entidad_federativa
+      ENT_FED: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff
+      FECHA_FIN_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion
+      ANIO: anio
+      CALENDARIO_FISCAL_DEL_CICLO: calendario_fiscal_del_ciclo
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CICLO: ciclo
+      DESC_CLAS_CIUDADANA: descripcion_clasificacion_ciudadana
+
+  # ------------------------------------------------------------------------------------
+  # 2015 -- el más viejo, nomenclatura RAMO/UNIDAD, columnas exclusivas de ese año.
+  # ------------------------------------------------------------------------------------
+  d793e828e209d2a4e24f54799173e315e6bfd5d46b09037f7c97dcb900f40656:
+    periodo: "2015 (único snapshot de ese año)"
+    n_columnas: 45
+    columnas:
+      CVE_PPI: cve_cartera
+      NOMBRE: nombre_ppi
+      RAMO: id_ramo
+      DESC_RAMO: descripcion_ramo
+      UNIDAD: id_ur
+      DESC_UNIDAD: descripcion_ur
+      TIPO_PPI: descripcion_tipo_ppi
+      DESCRIPCION: descripcion_ppi
+      LOCALIZACION: localizacion
+      CVE_ENTFED: id_entidad_federativa
+      ENT_FED: entidad_federativa
+      LATITUD_INICIAL: latitud
+      LONGITUD_INICIAL: longitud
+      FECHA_INI_CAL_FISCAL: fecha_inicio_cal_fiscal
+      FECHA_FIN_CAL_FISCAL: fecha_fin_cal_fiscal
+      FECHA_INI_FF: fecha_inicio_cal_ff
+      FECHA_FIN_FF: fecha_fin_cal_ff
+      ANIOS_HE: anios_he
+      NOMBRE_ADMIN: nombre_admin
+      AP_MATERNO_ADMIN: apellido_materno_admin
+      AP_PATERNO_ADMIN: apellido_paterno_admin
+      CARGO_ADMIN: cargo_admin
+      MAIL_ADMIN: mail_admin
+      TELEFONO_ADMIN: telefono_admin
+      META_FISICA: meta_fisica
+      META_BENEFICIOS: beneficios_esperados
+      ID_PPI: id_ppi
+      APROBADO: aprobado
+      MODIFICADO: modificado
+      EJERCIDO: ejercido
+      AVANCE_FISICO: avance_fisico
+      GRUPO_FUNCIONAL: grupo_funcional
+      FUNCION: funcion
+      MONTO_TOTAL_INVERSION: monto_total_inversion
+      TOTAL_GASTO_OPERACION_HE: total_gasto_operacion_he
+      TOTAL_GASTO_NO_CONSID: total_gasto_no_considerado
+      COSTO_TOTAL_PPI: costo_total_inversion
+      ANIO: anio
+      MONTO_ASIGAUTACT: monto_asignacion_actual
+      RECURSOS_ESTATALES: estatal
+      RECURSOS_MUNICIPALES: municipal
+      PRIVADOS: privada
+      FIDEICOMISO: fideicomiso
+      CICLO: ciclo
+      TIPO_PROYECTO: tipo_proyecto
+
+# ============================================================================
+# Snapshots con corte declarado que NO se deben normalizar -- el pipeline debe
+# rechazarlos explícitamente, no intentar mapear su "esquema" (no tienen uno real).
+# ============================================================================
+snapshots_conocidos_corruptos:
+  - archivo_bronze: opa_2024_1_0923b83f.csv
+    url: https://www.transparenciapresupuestaria.gob.mx/work/models/PTP/DatosAbiertos/OPA/2024/ConsolidadoOPA1erTrimestre2024.csv
+    razon: >
+      El servidor sirve un binario OLE2 (firma de Excel .xls antiguo) con extensión .csv y
+      Content-Type text/csv. El archivo está truncado en la fuente misma -- el
+      Content-Length del servidor (1,466,368 bytes) coincide exactamente con lo descargado,
+      no es un problema de nuestra descarga, y xlrd confirma "Workbook stream length (2834670
+      bytes) > file data size (1465856 bytes)". Sin captura alterna en Wayback (verificado
+      2026-08-08). corte_declarado sigue siendo {anio: 2024, trimestre: 1} en el manifiesto
+      -- vivo según discovery.py (200, Content-Type correcto), pero el contenido no es
+      usable. Ver README para el detalle completo.
+  - archivo_bronze: opa_2024_1_d9f08486.csv
+    url: https://www.transparenciapresupuestaria.gob.mx/work/models/PTP/DatosAbiertos/OPA/2024/SeguimientoOPA1erTrimestre2024.csv
+    razon: "Mismo problema que ConsolidadoOPA1erTrimestre2024.csv -- ver esa entrada."
+  - archivo_bronze: opa_2024_1_c38b00d6.csv
+    url: https://www.transparenciapresupuestaria.gob.mx/work/models/PTP/DatosAbiertos/OPA/2024/ConcluidosOPA1erTrimestre2024.csv
+    razon: "Mismo problema que ConsolidadoOPA1erTrimestre2024.csv -- ver esa entrada."
