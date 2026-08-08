@@ -22,6 +22,17 @@ anios:
 fuente_viva:
   base_url: "https://www.transparenciapresupuestaria.gob.mx"
   # Placeholders soportados: {anio}, {n} (1..4), {ord} (1er..4to), {v} (2,3).
+  #
+  # Fase 1 (2026-08-07/08): el hueco 2022-2026 que dejó Fase 0 NO era descontinuación --
+  # el portal migró a una SPA (Next.js, /work/models/PTP/NPTP/) y renombró los archivos
+  # trimestrales, en la MISMA carpeta /DatosAbiertos/OPA/{anio}/ que ya se probaba. Las 4
+  # líneas nuevas de abajo son ese patrón, confirmadas con GET real (no solo status) y
+  # esquema de columnas idéntico al ya documentado en reports/esquemas.md, para los 17
+  # trimestres 2022-2026T1. "Concluido(s)OPA" alterna singular/plural sin regla clara por
+  # año -- se prueban ambas formas a propósito, no es redundancia. El propio portal expone
+  # además un manifiesto JSON con los enlaces vigentes (ver auxiliares abajo): confirma el
+  # patrón pero solo lista el trimestre más reciente por archivo, así que no reemplaza el
+  # sondeo histórico trimestre a trimestre.
   patrones:
     - "/work/models/PTP/DatosAbiertos/OPA/{anio}/proyectos_opa.csv"
     - "/work/models/PTP/DatosAbiertos/OPA/{anio}/proyectos_opa.xlsx"
@@ -30,6 +41,10 @@ fuente_viva:
     - "/work/models/PTP/DatosAbiertos/OPA/{anio}/reporteOPA{ord}Trimestre.xlsx"
     - "/work/models/PTP/DatosAbiertos/OPA/{anio}/reporteOPA{ord}Trimestre_V{v}.xlsx"
     - "/work/models/PTP/OPA/{anio}/Proyectos_OPA.csv"  # patrón antiguo
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/ConsolidadoOPA{ord}Trimestre{anio}.csv"  # patrón nuevo (Fase 1)
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/SeguimientoOPA{ord}Trimestre{anio}.csv"  # patrón nuevo (Fase 1)
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/ConcluidosOPA{ord}Trimestre{anio}.csv"  # patrón nuevo (Fase 1), plural
+    - "/work/models/PTP/DatosAbiertos/OPA/{anio}/ConcluidoOPA{ord}Trimestre{anio}.csv"  # patrón nuevo (Fase 1), singular
   trimestre_n: [1, 2, 3, 4]
   trimestre_ord: ["1er", "2do", "3er", "4to"]
   version_v: [2, 3]
@@ -38,6 +53,10 @@ fuente_viva:
     - "/work/models/PTP/DatosAbiertos/Diccionarios/diccionario_opa.xlsx"
     - "/work/models/PTP/DatosAbiertos/Metadatos/catalogos.xlsx"
     - "/work/models/PTP/OPA/app.xlsx"
+    # Manifiesto oficial autogenerado por el portal (Fase 1): lista sus propios enlaces de
+    # descarga vigentes. Útil como referencia cruzada, no como fuente única -- solo apunta
+    # al trimestre más reciente de cada archivo, no al histórico completo.
+    - "/work/models/PTP/NPTP/api/page-config/opa/row-down-opa.json"
 
 # --- Fuente 2: espejos ----------------------------------------------------
 fuente_espejo:
