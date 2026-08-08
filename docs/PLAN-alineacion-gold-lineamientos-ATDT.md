@@ -3,7 +3,9 @@
 **Fecha:** 2026-08-08
 **Referencia normativa:** [Acuerdo DOF 11/09/2025](normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md)
 (transcripción completa en este repo; PDF original en `docs/normativa/`).
-**Estado:** Fases A, B y C completas (2026-08-08). Fase D pendiente.
+**Estado:** Fases A, B, C y D completas (2026-08-08). Único pendiente explícito: publicación
+externa (GitHub Release / Hugging Face / Zenodo DOI), fuera de alcance a propósito -- ver
+Fase D, punto 3.
 
 ---
 
@@ -150,18 +152,38 @@ Integración del comando CLI hecha a mano, no delegada.
    en CI todavía (añadir uno implicaría una dependencia nueva, fuera del alcance que se le
    pidió a los agentes de esta fase). Queda como pendiente explícito, no como completo.
 
-### Fase D -- Contexto, privacidad y empaquetado final
+### Fase D -- Contexto, privacidad y empaquetado final -- 1 y 2 completos, 3 fuera de alcance (2026-08-08)
 
-1. Evaluación de datos personales (Art. 38-VI) contra datos reales: revisar columnas de texto
-   libre (`nombre_ppi`, `descripcion_ur`, `localizacion`) buscando nombres de personas físicas.
-   Documentar el resultado en la nota técnica, sea cual sea.
-2. `NOTA-TECNICA.md` dentro del paquete (Art. 39-IV-c): limitaciones conocidas y verificadas --
-   patrón estacional Q4→Q1 (investigación 2026-08-08), 2024-T1 corrupto en la fuente, cobertura
-   parcial 2020 T1/T2, huecos 2016/2017-T4/2018 (agotados por 4 vías, pendiente PNT/INAI),
-   deflactación NULL hasta tener serie INPC, variantes de texto sin normalizar en
-   `estatus_operacion`/`descripcion_tipo_ppi`.
-3. Publicación: GitHub Release con el paquete versionado; después Hugging Face y DOI de Zenodo
-   (identificador permanente, Art. 5-VI). El README gana una sección "Cómo citar".
+1. ✅ Evaluación de datos personales (Art. 38-VI) contra datos reales de `dim_ppi`
+   (`nombre_ppi`: 11,119 valores distintos; `descripcion_ur`: 506; `localizacion`: 5,166).
+   Coordinada con 3 agentes: 2 investigaciones independientes con metodologías distintas
+   (barrido heurístico por patrón de nombre + honoríficos con ~350 candidatos inspeccionados
+   a mano; muestreo aleatorio con vocabulario de exclusión institucional sobre ~1,750 valores
+   atípicos, 996 valores leídos línea por línea) más una verificación adversarial que corrió
+   4 consultas SQL propias buscando específicamente los huecos que ninguna de las dos primeras
+   cubría (apellidos sueltos de una palabra, vocabulario de sucesión/propiedad personal,
+   patrones tipo RFC/CURP, formato "C. Nombre Apellido"). **Resultado: CONFIRMADO -- sin datos
+   personales encontrados.** Los patrones "Nombre Apellido" que sí aparecen son siempre
+   instituciones/hospitales en honor a figuras históricas, calles, topónimos, o razones
+   sociales de contratistas -- nunca un particular. Salvedad declarada: es revisión por
+   muestreo extenso (>1,300 valores distintos), no un censo exhaustivo de los ~16,700.
+2. ✅ `src/opa/publish_nota.py` -- `NOTA-TECNICA.md` dentro del paquete (Art. 39-IV-c),
+   generada por `opa publish` en cada corrida (no una versión congelada a mano). Reutiliza
+   `resumen_procedencia()`/`resumen_calidad()` de `dcat_procedencia.py` (Fase C) para los
+   números citados -- confirmado en la revisión adversarial que no hay lógica de parseo
+   duplicada. 7 secciones: el veredicto de privacidad íntegro (punto 1), patrón estacional
+   Q4→Q1, calidad conocida (números reales), cobertura parcial 2020 T1/T2, huecos históricos
+   (el revisor confirmó que el número citado -- 7 trimestres: 2016 T1/T2/T4, 2017 T4, 2018
+   T1/T2/T4 -- coincide exactamente con README.md al momento de generarse, no una versión
+   vieja), deflactación pendiente, variantes de texto sin normalizar. `checksums.sha256` corre
+   al final del pipeline de `opa publish` y cubre también `NOTA-TECNICA.md` (y `catalog.json`).
+   Corrida real verificada: 33 archivos totales en el paquete, checksums en verde, segunda
+   corrida produce bytes idénticos.
+3. ⏸ **Fuera de alcance de este trabajo, no ejecutado a propósito:** GitHub Release, Hugging
+   Face y DOI de Zenodo son acciones de publicación pública -- requieren una decisión
+   explícita del dueño del repo y credenciales de esas plataformas, no algo que corresponda
+   automatizar sin esa autorización directa. El README sí gana la sección "Cómo citar" que
+   este punto pedía, con el texto de cita listo para cuando se decida publicar.
 
 ## 4. El extra sobre los Lineamientos: Parquet y GeoJSON
 

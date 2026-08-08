@@ -346,8 +346,25 @@ CLI, con `checksums.sha256` corriendo al final para cubrir también `catalog.jso
 contra el paquete real: 8 datasets, 15 distribuciones en `fct_ppi_observacion`, checksums en
 verde, y el paquete completo produce bytes idénticos en una segunda corrida.
 
-Pendiente del plan: **Fase D** (evaluación de datos personales + nota técnica de limitaciones
-empaquetada con los datos).
+**Fase D -- Contexto, privacidad y empaquetado final, completa.** Evaluación de datos
+personales (Art. 38-VI) contra los datos reales de `dim_ppi` (`nombre_ppi`, `descripcion_ur`,
+`localizacion`): 2 investigaciones independientes con metodologías distintas (barrido
+heurístico por patrón de nombre + honoríficos, y muestreo aleatorio con vocabulario de
+exclusión sobre los valores atípicos) más una verificación adversarial que buscó
+específicamente los huecos que ninguna de las dos cubría (apellidos sueltos, vocabulario de
+sucesión/propiedad, patrones RFC/CURP) -- más de 1,300 valores distintos inspeccionados a
+mano. **Resultado: sin datos personales encontrados.** `opa publish` ahora también escribe
+`data/publish/{version}/NOTA-TECNICA.md`, que empaqueta ese veredicto junto con las demás
+limitaciones ya documentadas de este dataset (patrón estacional Q4→Q1, 2024 T1 corrupto en la
+fuente, cobertura parcial 2020 T1/T2, los 7 trimestres-hueco reales, deflactación pendiente,
+variantes de texto sin normalizar) -- con los números citados vía `resumen_procedencia()`/
+`resumen_calidad()` (Fase C, reutilizadas, no reimplementadas) para que nunca se desactualicen
+en silencio. `checksums.sha256` corre al final del pipeline y cubre también este archivo.
+
+Con esto, las 4 fases del plan quedan completas. **Fuera de alcance de este README, pendiente
+de una decisión explícita:** publicar el paquete versionado como GitHub Release, Hugging Face
+y un DOI de Zenodo (ver la sección "Cómo citar" más abajo) -- son acciones de publicación
+pública que requieren autorización y credenciales que este trabajo no asume por su cuenta.
 
 ## Cómo correr Fase 0 + Bronze + Silver + Gold
 
@@ -392,10 +409,10 @@ dbt build --project-dir dbt --profiles-dir dbt
 # reports/diccionario/ (versionado en git).
 uv run opa diccionario
 
-# Publicación de distribuciones (Fase B) + catálogo DCAT (Fase C). CSV + Parquet + GeoJSON +
-# catalog.json (DCAT) + checksums.sha256 (cubre también catalog.json) en
-# data/publish/{version}/ (fuera de git) -- version por defecto = corte más reciente del
-# duckdb (ej. 2026T1), o pasa --version explícito.
+# Publicación de distribuciones (Fase B) + catálogo DCAT (Fase C) + nota técnica (Fase D).
+# CSV + Parquet + GeoJSON + catalog.json (DCAT) + NOTA-TECNICA.md + checksums.sha256 (cubre
+# también catalog.json y NOTA-TECNICA.md) en data/publish/{version}/ (fuera de git) --
+# version por defecto = corte más reciente del duckdb (ej. 2026T1), o pasa --version explícito.
 uv run opa publish
 ```
 
@@ -431,3 +448,24 @@ Los **datos** de OPA son un conjunto separado, sujeto a los **Términos de Libre
 Datos Abiertos" (DOF 20/02/2015). Toda redistribución debe citar: nombre del conjunto de datos,
 siglas de la dependencia (SHCP), liga de los datos descargados y fecha de consulta en formato
 `AAAA-MM-DD`.
+
+## Cómo citar
+
+Los Términos de Libre Uso MX (arriba) piden 4 elementos en toda redistribución. Para el paquete
+que genera `opa publish` (`data/publish/{version}/`):
+
+> Panel Histórico de Obra Pública Federal (México), reconstruido de Obra Pública Abierta (OPA),
+> Secretaría de Hacienda y Crédito Público (SHCP).
+> https://github.com/iChocko/panel-obra-publica-mx -- versión `{version}` (ej. `2026T1`).
+> Fecha de consulta: `AAAA-MM-DD`.
+
+El paquete mismo trae todo lo necesario para verificar y citar con precisión sin depender de
+este README: `catalog.json` (metadatos DCAT completos, procedencia y calidad reales -- Fase C),
+`NOTA-TECNICA.md` (limitaciones conocidas del dataset -- Fase D) y `checksums.sha256`
+(integridad de cada archivo, cubre también `catalog.json` y `NOTA-TECNICA.md`).
+
+**Pendiente, fuera del alcance de este README:** publicar el paquete versionado como GitHub
+Release, y después en Hugging Face con un DOI de Zenodo (identificador permanente, Art. 5-VI de
+los Lineamientos ATDT) -- son acciones de publicación pública que requieren una decisión
+explícita de a quién le pertenece el repo y credenciales de las plataformas correspondientes,
+no algo que se automatice sin esa autorización.

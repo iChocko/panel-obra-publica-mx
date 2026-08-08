@@ -593,7 +593,7 @@ def publish(
     Determinista: mismo duckdb produce siempre los mismos bytes. Falla ruidoso (código 1)
     si falta alguna de las 8 tablas publicables.
     """
-    from opa import publish_dcat, publish_geojson, publish_manifest, publish_tabular
+    from opa import publish_dcat, publish_geojson, publish_manifest, publish_nota, publish_tabular
     from opa.dcat_config import ErrorDcatConfig
     from opa.dcat_procedencia import ErrorProcedencia
 
@@ -629,8 +629,18 @@ def publish(
         console.print(f"[bold red]No se pudo generar el catálogo DCAT.[/] {exc}")
         raise typer.Exit(code=1) from exc
 
-    # checksums.sha256 va AL FINAL, después de catalog.json, para que también lo cubra --
-    # es el último archivo del paquete en escribirse.
+    try:
+        ruta_nota = publish_nota.escribir_nota_tecnica(
+            dir_paquete=dir_paquete,
+            ruta_manifest=RUTA_MANIFEST_JSONL,
+            ruta_calidad_silver=RUTA_CALIDAD_SILVER_MD,
+        )
+    except ErrorProcedencia as exc:
+        console.print(f"[bold red]No se pudo generar la nota técnica.[/] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    # checksums.sha256 va AL FINAL, después de catalog.json y NOTA-TECNICA.md, para que
+    # también los cubra -- son los últimos archivos del paquete en escribirse.
     try:
         ruta_checksums = publish_manifest.escribir_checksums(dir_paquete)
     except publish_manifest.ErrorManifiesto as exc:
@@ -639,7 +649,8 @@ def publish(
 
     console.print(
         f"\n[bold green]Publicación completa.[/] {len(tabulares)} archivos tabulares, "
-        f"{len(geojson)} GeoJSON, catálogo DCAT en {ruta_catalog}, checksums en {ruta_checksums}"
+        f"{len(geojson)} GeoJSON, catálogo DCAT en {ruta_catalog}, nota técnica en {ruta_nota}, "
+        f"checksums en {ruta_checksums}"
     )
 
 
