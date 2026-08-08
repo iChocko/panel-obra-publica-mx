@@ -80,6 +80,16 @@ contra el duckdb real antes de commitear.
    RFC 7946 por año de `anio_corte` (+ `ppi_sin_anio.geojson` para el residual sin año) --
    corrida real: 12 archivos por año 2015-2026 + 1 residual, `coordinates` en orden
    `[longitud, latitud]` verificado, nulos como `null` real (no `NaN` ni texto).
+   **Enriquecido (2026-08-08, a petición explícita):** cada punto trae además `nombre_ppi`,
+   `descripcion_ur` y `localizacion` (viven en el SCD2 `dim_ppi`, no en `fct_ppi_observacion`)
+   más `trimestre_corte`, `fase` y los montos `aprobado`/`ppef`/`pef` que antes faltaban. El
+   join con `dim_ppi` usa el rango `vigente_desde_corte`/`vigente_hasta_corte` para tomar la
+   versión SCD2 vigente en el corte exacto de cada observación, no la más reciente -- un join
+   directo por `cve_cartera` habría puesto el nombre/ubicación de HOY en observaciones de
+   2015. Es LEFT JOIN a propósito (snapshots anuales genéricos sin trimestre no calzan ningún
+   rango y se siguen publicando sin enriquecer, en vez de desaparecer del mapa). Corrida real:
+   96.4% de los puntos de 2021 trajeron `nombre_ppi` (el resto son casos legítimos sin versión
+   vigente de `dim_ppi` en ese corte, no un bug del join).
 3. ✅ `src/opa/publish_manifest.py`: `checksums.sha256` formato `sha256sum` estándar
    (verificable con `shasum -a 256 -c`). La revisión adversarial encontró un bug real: las
    líneas se ordenaban por el STRING COMPLETO `"{hash}  {ruta}"`, es decir por hash primero

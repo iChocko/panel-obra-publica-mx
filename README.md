@@ -324,7 +324,10 @@ tablas en CSV (RFC 4180, formato base que exigen los Lineamientos) y Parquet, m�
 tablas georreferenciadas, y `checksums.sha256` verificable con `shasum -a 256 -c`. Construida
 con 3 módulos independientes vía workflow multi-agente (implementación + revisión adversarial
 por módulo, que encontró y corrigió 2 bugs reales: CSV sin CRLF pese a prometer RFC 4180, y
-checksums ordenados por hash en vez de por ruta) e integrada a mano en el CLI. Verificado
+checksums ordenados por hash en vez de por ruta) e integrada a mano en el CLI. El GeoJSON viene
+enriquecido con `nombre_ppi`/`descripcion_ur`/`localizacion` (de `dim_ppi`, unido por el rango
+de vigencia SCD2 -- no la versión más reciente) más `trimestre_corte`, `fase` y los montos
+`aprobado`/`ppef`/`pef`: 96.4% de los puntos de 2021 traen nombre real de proyecto. Verificado
 contra el duckdb real: 30 archivos, checksums en verde, y una segunda corrida produce bytes
 **idénticos** a la primera -- el determinismo se comprobó, no se asumió.
 
