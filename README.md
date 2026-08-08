@@ -1,449 +1,320 @@
 # Panel Histórico de Obra Pública Federal (México)
 
-## Tesis
+Serie histórica trimestral 2015–2026 del padrón de **Programas y Proyectos de Inversión (PPI)**
+del gobierno federal mexicano, reconstruida a partir de *Obra Pública Abierta* (OPA) de la SHCP.
 
-La SHCP publica cada trimestre una fotografía del universo de proyectos de inversión federal
-(PPI) en su sección de **Obra Pública Abierta (OPA)**. Cada fotografía nueva sobreescribe a la
-anterior: el visor y los archivos de nombre genérico solo muestran el corte más reciente. **La
-fuente destruye su propia historia.** Este repositorio la reconstruye a partir de tres capas —
-archivos vivos con nombre de trimestre, espejos en portales de datos abiertos, y capturas del
-Internet Archive (Wayback Machine) — para publicar un panel longitudinal por clave de cartera
-que hoy no existe públicamente en ningún otro lugar.
+**[⬇ Descargar los datos — release `datos-2026T1`](https://github.com/iChocko/panel-obra-publica-mx/releases/tag/datos-2026T1)**
+· CSV + Parquet + GeoJSON · catálogo DCAT · nota técnica · checksums verificables
 
-Ver [`viabilidad_tecnica`](viabilidad_tecnica) (dictamen de viabilidad) y
-[`ARQUITECTURA-panel-obra-publica-mx.md`](ARQUITECTURA-panel-obra-publica-mx.md) (arquitectura
-completa del proyecto) para el detalle.
+---
 
-## Estado: Fase 0 + Fase 1 — Reconocimiento y resolución de huecos (2026-08-08)
+## El problema
 
-**Recuperabilidad trimestral 2016–2024: 29 / 36 (80.6%) → por encima del 70%.**
+La Secretaría de Hacienda publica cada trimestre una fotografía del universo de proyectos de
+inversión federal en su portal de Obra Pública Abierta: qué se está construyendo, dónde, con
+cuánto presupuesto, con qué avance físico.
 
-**Recomendación: panel trimestral completo, alcance original** -- no el pivote a panel anual que
-había recomendado la primera corrida, ni siquiera el panel parcial de la segunda. Detalle completo
-en [`reports/cobertura.md`](reports/cobertura.md).
+El problema es cómo la publica. **Cada fotografía nueva sobreescribe a la anterior.** El visor
+oficial muestra solo el corte más reciente, y los archivos de descarga con nombre genérico
+(`proyectos_opa.csv`) apuntan siempre al último trimestre. No hay archivo histórico, no hay
+versionado, no hay forma oficial de preguntar "¿cómo se veía este proyecto hace tres años?".
 
-> **Nota de transparencia metodológica:** la corrida original de Fase 0 (2026-08-05) midió 4/36
-> (11.1%) y recomendó pivotar a panel anual. Fase 1 (2026-08-08) resolvió por qué 2022-2026 no
-> respondía (cambio de nombre de archivo, no descontinuación) y subió la cifra a 22/36 (61.1%,
-> panel parcial). Una segunda ronda de Fase 1 el mismo día resolvió además 2019 completo y 2020
-> T3/T4, subiendo a 28/36 (77.8%). Al preparar Bronze se encontró que 76 capturas de Wayback ya
-> recolectadas desde Fase 0 nunca se habían clasificado (su nombre de archivo no coincidía con
-> ningún patrón conocido) -- una de ellas resultó ser 2016 T3 real (esquema viejo, `ANIO=2016`
-> confirmado en el 99% de sus filas), subiendo a **29/36 (80.6%)**. Es decir: la declaración de
-> "4 vías agotadas, huecos confirmados" de la ronda anterior no era del todo cierta -- ya
-> teníamos evidencia sin cruzar en nuestros propios datos. El número y la recomendación
-> **vigentes son los de arriba**; se documentan los intermedios por trazabilidad, no como estado
-> actual.
+Eso tiene una consecuencia concreta para cualquiera que quiera analizar inversión pública: **se
+puede ver el estado actual de un proyecto, pero no su trayectoria.** No se puede medir cuánto se
+encareció una obra respecto a su presupuesto original, cuánto tardó de más, cuántos proyectos se
+cancelaron a media ejecución, ni qué dependencias tienen sobrecostos sistemáticos. La información
+existió públicamente en algún momento —trimestre por trimestre— pero la fuente destruye su propia
+historia conforme avanza.
 
-Hallazgos clave:
+Este repositorio reconstruye esa historia y la publica como un panel longitudinal por clave de
+cartera, que hoy no existe en ningún otro lugar público.
 
-- **El patrón de nombre de archivo cambió en 2022, no la disponibilidad de los datos.** El portal
-  migró a una aplicación Next.js y renombró los trimestrales dentro de la MISMA carpeta que Fase 0
-  ya recorría (`/work/models/PTP/DatosAbiertos/OPA/{año}/`): de
-  `reporteOPA{trimestre}Trimestre.xlsx` a una familia nueva --
-  `ConsolidadoOPA{trimestre}Trimestre{año}.csv` (maestro),
-  `SeguimientoOPA{trimestre}Trimestre{año}.csv` (seguimiento trimestral) y
-  `Concluido(s)OPA{trimestre}Trimestre{año}.csv` (concluidos ese trimestre -- la pluralización
-  alterna sin regla clara por año, hay que probar ambas formas). Confirmado con GET real (no solo
-  status HTTP) para los 17 trimestres 2022-2026T1, mismo esquema de columnas ya documentado en
-  `reports/esquemas.md`. El portal expone también un manifiesto JSON propio
-  (`/work/models/PTP/NPTP/api/page-config/opa/row-down-opa.json`, archivado en
-  `data/auxiliares/`) con sus enlaces vigentes -- útil como referencia cruzada, aunque solo cubre
-  el trimestre más reciente de cada archivo, no el histórico completo.
-- **2019 completo y 2020 T3/T4 también se resolvieron, vía el mismo manifiesto oficial**, que
-  etiqueta cada URL con su trimestre en texto plano (no solo por nombre de archivo) -- pero **esa
-  etiqueta resultó no ser confiable sin verificar el contenido**: `opa_trimestral.csv` venía
-  etiquetado "Primer trimestre 2019" y vive en la carpeta `/2019/`, pero al inspeccionarlo tiene
-  `CICLO=2018` en el 100% de sus filas -- no es T1 2019, es un archivo de otro ciclo fiscal mal
-  ubicado (o mal etiquetado) por el propio portal. El T1 2019 real es `OPAPrimerTrimestre2019.csv`
-  (`CICLO=2019` confirmado en sus 1,513 filas), encontrado por analogía de patrón, no por el
-  manifiesto. `opa_trimestral.csv` se conserva como auxiliar archivable (dato real, solo que de
-  2018) en vez de usarse para llenar la celda de T1 2019. El resto son 5 URLs exactas con la misma
-  nomenclatura irregular (`OPASegundoTrimestre2019.csv`, `OPATercerTrimestre2019.csv` -- el
-  manifiesto trae un typo, `OPATerceTrimestre2019.csv`, que da 404 --, `OPA4toTrimestre2019.csv`, y
-  `OPA3er4toTrimestre2020.csv`). Este último cubre T3 y T4 de 2020 en un solo archivo -- se
-  verificó que **no trae ninguna columna que distinga fila por trimestre** (`CICLO` es un único
-  valor, `2020`, en las 1,549 filas), así que se cuenta como el corte combinado oficial de ese
-  periodo tal como lo publicó la SHCP, no como dos trimestres verificables por separado a nivel de
-  fila. Todas documentadas como `casos_especiales` en `conf/sources.yml` en vez de forzarlas al
-  mecanismo de patrones parametrizados.
-- **La hipótesis de que OPA se fusionó con el Tomo VIII del PEF es falsa.** Tomo VIII sí tiene un
-  CSV real y vivo 2022-2025 (`REPORTE_TOMO_VIII.csv`), pero es presupuesto ex-ante -- sin avance
-  físico, monto ejercido ni geolocalización -- nunca pudo sustituir a OPA en granularidad. Son
-  complementarios, no sucesores.
-- **2016 T3 se resolvió aparte, al preparar Bronze** -- no por una nueva búsqueda, sino por
-  reclasificar en frío 76 capturas de Wayback que Fase 0 ya tenía recolectadas pero nunca
-  clasificó (nombre de archivo sin patrón reconocido: `Proyectos_OPA_3t.csv`, esquema viejo
-  `CVE_PPI`). Sigue viva hoy en el servidor. Se probó la misma convención (`Proyectos_OPA_{n}t.csv`)
-  para 1t/2t/4t de 2016 y las 4 combinaciones de 2017-2018 -- todas 404, no es un patrón amplio,
-  es un archivo suelto. `clasificar_captura()` se actualizó para que una futura corrida de
-  Wayback lo reconozca automáticamente.
-- **Los 7 trimestres que siguen como hueco son reales**, agotados por 4 vías independientes
-  (manifiesto oficial, Wayback CDX dirigido por año, Common Crawl, variaciones de nomenclatura
-  probadas en vivo) más la reclasificación en frío de arriba: 2016 T1/T2/T4, 2017 T4, y 2018
-  T1/T2/T4. El siguiente paso realista es una solicitud de acceso a la información (PNT/INAI) a
-  la SHCP, no más descubrimiento automatizado. Quedan documentados como huecos en
-  `reports/cobertura.md`.
-- **El esquema cambia de forma importante entre 2015 y 2019/2021** (45 vs. 47 columnas, `CVE_PPI`
-  vs. `CVE_CARTERA`, nombres de columna casi todos distintos). 2019 y 2021 comparten esquema.
-- **`cve_cartera` no es el código numérico de 10-11 dígitos que asumía la arquitectura**: en 2019 y
-  2021 aparecen valores como `'2151GYN0003` (0% cumple `^\d{10,11}$`). El contrato Pandera de la
-  arquitectura (sección 6.1) necesita revisarse en Fase 2 con datos reales, no con la forma
-  esperada.
-- **El mirror de datos.gob.mx (CKAN, id `56b98e14-...`) ya no existe** en el catálogo actual --
-  reconfirmado en Fase 1: 0 de 54 datasets de la organización `secretaria_hacienda` corresponden a
-  OPA/obra pública/inversión. `datamx.io` tampoco tiene referencia. Wayback y el servidor vivo
-  siguen siendo las únicas fuentes reales.
-- **Wayback Machine sí archivó archivos de datos, no solo HTML**: 90 capturas con mimetype real
-  (`text/csv`, `.xlsx`) entre 2016 y 2024, sin bloqueo ni rate-limit de la CDX API.
+## Cómo se resolvió
 
-Ver [`reports/esquemas.md`](reports/esquemas.md) para el detalle columna por columna de las 3
-muestras (2015, 2019, 2021), y [`reports/cobertura.md`](reports/cobertura.md) para la matriz
-completa año × trimestre.
+La reconstrucción se apoya en tres fuentes en cascada, porque ninguna sola alcanza:
 
-## Bronze — snapshots archivados (2026-08-08)
+| Fuente | Qué aporta |
+|---|---|
+| **Servidor vivo de la SHCP** | Los archivos con trimestre explícito en el nombre siguen ahí, aunque el portal no los enlace. Hay que adivinar la URL. |
+| **Wayback Machine** (CDX API) | Capturas de archivos de datos —CSV y XLSX reales, no solo HTML— de cortes que ya no están vivos. |
+| **Manifiesto JSON del portal** | El propio portal expone un índice interno de descargas que etiqueta URLs con su trimestre en texto plano. Útil como pista, no como verdad (ver *Hallazgos*). |
 
-**128 archivos únicos (215 MB), byte por byte tal como los sirvió la fuente**, hasheados y con
-procedencia completa en [`data/manifest.jsonl`](data/manifest.jsonl) -- 89 desde el servidor vivo
-de la SHCP, 53 solo recuperables vía Wayback Machine. Cubre 2015-2026 completo salvo los 7
-trimestres documentados como hueco real (2016 T1/T2/T4, 2017 T4, 2018 T1/T2/T4) -- **no
-inventados, no interpolados, simplemente no existen bajo ninguna fuente conocida** (ver la nota
-de transparencia metodológica arriba).
+El resultado: **29 de 36 trimestres del periodo 2016–2024 son recuperables (80.6%)**, además de
+2015 y de todo 2025–2026. Los 7 trimestres restantes se agotaron por cuatro vías independientes y
+quedan documentados como huecos reales, no interpolados.
 
-**Regla dura del proyecto (ver `ARQUITECTURA-panel-obra-publica-mx.md` sección 4.1): bronze nunca
-se reescribe.** El nombre de cada archivo incluye los primeros 8 caracteres de su sha256
-(`opa_{año}_{trimestre}_{sha8}.{ext}`), así que es direccionable por contenido -- volver a correr
-la ingesta es idempotente por diseño, no por una bandera de "--skip-existentes".
+## Qué hay en el panel
 
-`data/bronze/` **no está en git** (demasiado pesado para el repo -- ver la sección "Almacenamiento
-de datos pesados" de la arquitectura, pendiente de subir a un bucket). `data/manifest.jsonl` **sí
-está versionado**: es pequeño, es la prueba de procedencia, y satisface el requisito de cita de
-los Términos de Libre Uso MX (liga + fecha de descarga). Cualquiera puede reproducir bronze
-completo corriendo `uv run opa bronze` -- vuelve a descargar los mismos bytes (mismo hash) de las
-mismas URLs que ya están documentadas en `reports/discovery.jsonl`.
+Números reales del build actual (`data/gold/panel_opa.duckdb`):
 
-**Un hallazgo de calidad de datos real, encontrado al inspeccionar los archivos ya archivados:**
-los 3 productos de **2024 T1** (`ConsolidadoOPA1erTrimestre2024.csv`,
-`SeguimientoOPA1erTrimestre2024.csv`, `ConcluidosOPA1erTrimestre2024.csv`) están **corruptos en
-la fuente misma** -- el servidor sirve un binario OLE2 (firma de Excel `.xls` antiguo) con
-extensión `.csv` y `Content-Type: text/csv`, truncado (`xlrd` confirma que el stream interno
-declara más bytes de los que el archivo realmente tiene). El `Content-Length` del servidor
-coincide exactamente con lo descargado -- no es un problema de nuestra descarga -- y no hay
-captura alterna en Wayback. Discovery (Fase 0/1) no lo detecta porque solo valida status HTTP y
-Content-Type, no contenido; por eso 2024 T1 sigue contando como "vivo" en `reports/cobertura.md`.
-Bronze lo preservó tal cual (es evidencia, no se borra) y `conf/schema_map.yml` lo marca
-explícitamente en `snapshots_conocidos_corruptos` para que Silver lo rechace ruidosamente en vez
-de intentar normalizarlo.
+| | |
+|---|---|
+| **11,025** | proyectos de inversión únicos (`cve_cartera`) |
+| **173,316** | observaciones proyecto × corte trimestral |
+| **34** | cortes trimestrales canónicos, 2015–2026 |
+| **6,702** | proyectos con coordenadas geográficas válidas |
+| **16,560** | versiones históricas de atributos (SCD2: cambios de nombre, ramo, ubicación) |
 
-## Silver — schema_map.yml y el contrato Pandera de cve_cartera (2026-08-08)
+Con eso se puede responder, por primera vez de forma directa: sobrecosto por proyecto (monto
+inicial vs. final), duración observada vs. planeada, trayectoria de avance físico, cambios de
+estatus, proyectos que desaparecen del padrón sin explicación, y la distribución geográfica de la
+inversión federal a lo largo de once años.
 
-**El desorden histórico que la arquitectura anticipaba (sección 4.2: "aquí es donde vive el
-trabajo real y donde aparecerán las sorpresas") resultó ser más desordenado de lo que la muestra
-de 3 archivos de Fase 0 alcanzaba a mostrar.** Inspeccionando columna por columna los 128
-archivos bronze reales (no una muestra), aparecieron **11 esquemas distintos**, no 2:
+## Arquitectura: cuatro capas
 
-- **2019-2026 es un esquema único y estable** (79 de 128 archivos, sin cambios en 7 años) --
-  buena noticia, es lo que van a seguir usando todos los cortes futuros.
-- **2015-2018 tiene 9 variantes reales**, no una sola "forma vieja": la nomenclatura de columnas
-  cambia varias veces dentro del mismo año (`RAMO` vs `ID_RAMO`, con y sin `CICLO`), hay columnas
-  que aparecen y desaparecen según el corte (`MODIFICADO`/`EJERCIDO`/`AVANCE_FISICO` faltan por
-  completo en un snapshot de 2016 -- no es un null, la columna no existía todavía), y **dos bugs
-  reales de la fuente**: el anual de 2018 tiene una columna llamada `CVE_PPI` dos veces (donde la
-  segunda debería decir `NOMBRE`), y uno de los snapshots de 2016 repite `RAMO` donde debería
-  decir `DESC_RAMO`. `conf/schema_map.yml` documenta cada variante con su `header_hash`, el
-  mapeo columna por columna a nombres canónicos, y marca con `[inferido]` los mapeos que son
-  un juicio semántico razonado, no una confirmación oficial de la SHCP.
+El pipeline sigue el patrón **medallón** (Bronze → Silver → Gold), más una capa de publicación.
+La idea central es que cada capa tiene una responsabilidad y **ninguna puede corregir en silencio
+lo que hizo la anterior**: si algo no cuadra, el proceso se detiene y lo reporta.
 
-**El contrato Pandera original del dictamen de viabilidad tenía tres supuestos que no
-sobrevivieron el contacto con datos reales** (`src/opa/contracts.py`, `OPASnapshot`):
+### Bronze — archivar sin tocar
 
-- `cve_cartera` **no es un numérico de 10-11 dígitos** (dictamen original: `^\d{10,11}$`, 0% de
-  cumplimiento ya confirmado desde Fase 0). Es **alfanumérico de 10-11 caracteres** una vez que
-  se quita una comilla inicial que trae el propio archivo (artefacto de Excel "forzar texto",
-  presente 2016-2026 pero no en 2015) -- confirmado sobre 32,186 valores reales, ~99.2% de
-  cumplimiento con `^[0-9A-Z]{10,11}$`. El ~0.8% restante es basura real de la fuente que el
-  contrato rechaza a propósito: valores centinela tipo `'020 96 020'` (se repiten idénticos entre
-  años, no son proyectos reales) y notación científica corrupta tipo `'8.36E+21'` (autocast de
-  Excel, dato irrecuperable).
-- `anio` **no siempre está presente incluso en el esquema moderno** -- ~20% de las filas lo traen
-  vacío (368/1786 verificado sobre un snapshot real de 2021), contra el supuesto original de que
-  siempre está poblado. `ciclo` suele tener valor cuando `anio` no lo tiene, pero no son
-  intercambiables sin más.
-- El *check* de coherencia `ejercido <= modificado * 1.05` del dictamen original **falla en 18.5%
-  de las filas reales** (278/1499 en un snapshot de 2021), varias por márgenes de cientos de veces,
-  no de redondeo -- probable mezcla de un campo acumulado desde el inicio del proyecto
-  (`EJERCIDO`) contra uno del ciclo vigente (`MODIFICADO`). **No se incluyó ese check en el
-  contrato**: comparar directo puede no tener sentido semántico, y forzar la tolerancia solo para
-  que pase ocultaría el problema real en vez de resolverlo. Queda documentado como pregunta
-  abierta para Fase 3, no adivinado.
+Descarga los archivos tal como los sirve la fuente y **nunca los reescribe**. Cada archivo se
+guarda con los primeros 8 caracteres de su SHA-256 en el nombre
+(`opa_{año}_{trimestre}_{sha8}.csv`), lo que lo hace *direccionable por contenido*: volver a
+correr la ingesta es idempotente por diseño, no por una bandera de "saltar existentes".
 
-`latitud`/`longitud` sí necesitaban el bbox de México del dictamen original (confirmado: hay
-valores basura reales, latitud hasta 436117.0) y `monto_total_inversion >= 0` se mantiene sin
-cambios (el máximo real, ~1.7 billones de pesos, es consistente con un megaproyecto agregado, no
-un error de unidades).
+Estado actual: **142 renglones de manifiesto** (89 desde el servidor vivo, 53 solo vía Wayback)
+→ **137 archivos en disco** → **128 contenidos únicos por hash** (el mismo archivo aparece a veces
+bajo dos URLs distintas). 236 MB en total.
 
-Probado de punta a punta contra un archivo bronze real completo (2021, 1786 filas): el contrato
-detecta correctamente los 13 valores `cve_cartera` centinela y 11 puntos fuera del bbox, sin
-falsos positivos en el resto.
+`data/manifest.jsonl` guarda la procedencia completa de cada uno —URL, origen, SHA-256, fecha de
+descarga, corte declarado— y **sí está versionado en git**: es la prueba de reproducibilidad y
+satisface el requisito de cita de los Términos de Libre Uso MX. Los archivos crudos no están en
+git por peso, pero cualquiera puede regenerarlos byte por byte con `opa bronze`.
 
-### `normalize.py` -- bronze → parquet canónico
+### Silver — normalizar sin adivinar
 
-`uv run opa normalize` corrió sobre los 91 snapshots únicos con corte declarado (128 archivos
-menos duplicados de contenido y los 3 corruptos de 2024 T1): **88 normalizados, 0 con esquema
-desconocido, 0 con error de lectura.** De 179,179 filas procesadas, **98.9% pasaron el contrato
-(177,245)** -- el resto quedó en cuarentena (excluido del parquet, no descartado en silencio: el
-motivo exacto por archivo está en `reports/calidad_silver.md`).
+Aquí vive el trabajo sucio. Inspeccionar los 128 archivos reales (no una muestra) reveló **11
+esquemas distintos**, no los 2 que se esperaban:
 
-**El primer intento dio 78.0% de filas válidas, no 98.9% -- la diferencia fue un hallazgo real,
-no un ajuste cosmético del contrato.** Casi todo el rechazo inicial (43,341 de 196,910 filas) caía
-en `latitud`/`longitud` fuera del bbox de México, concentrado casi por completo en los esquemas
-de 2015-2018. La causa: **`'0'` es un centinela real de "sin coordenadas" en el esquema viejo**
--- 48.6% de `LATITUD_INICIAL` en 2015 es literalmente `0` (verificado), y (0°N, 0°E) es
-geográficamente imposible en México de cualquier forma. El esquema moderno no usa esa convención
-(0 apariciones en 2021). `normalize.py` ahora trata `0` como nulo en `latitud`/`longitud` antes de
-validar -- documentado en `conf/schema_map.yml`. También se encontraron **4 formatos de fecha
-distintos** en el corpus (`2003-01-01 00:00:00`, `01/12/2002`, `mar-06`, `Enero/2001`), todos de
-precisión de mes -- ni el formato moderno `DD/MM/YYYY` tiene día real, siempre trae `01`
-(verificado sobre 2021 completo). `parsear_fecha_mes()` reconoce las 4; un quinto formato no
-reconocido se cuenta y reporta, no se adivina.
+- **2019–2026 es un esquema único y estable** (79 de 128 archivos, sin cambios en siete años).
+- **2015–2018 tiene 9 variantes reales**: la nomenclatura de columnas cambia varias veces dentro
+  del mismo año, hay columnas que aparecen y desaparecen entre cortes (`MODIFICADO` y
+  `AVANCE_FISICO` simplemente no existían en un snapshot de 2016 — no son nulos, la columna no
+  estaba), y hay **dos bugs de la fuente misma**: el anual de 2018 trae una columna llamada
+  `CVE_PPI` dos veces (la segunda debería decir `NOMBRE`), y un snapshot de 2016 repite `RAMO`
+  donde debería decir `DESC_RAMO`.
 
-Parquet, un archivo por snapshot, en `data/silver/` (78 MB, fuera de git igual que `data/bronze/`).
-Nombre de archivo = `snapshot_id` (ej. `2021Q3_ae02c33e.parquet`).
+`conf/schema_map.yml` documenta cada variante con su hash de encabezado y el mapeo columna por
+columna a nombres canónicos. Los mapeos que son un juicio semántico razonado —y no una
+confirmación oficial— se marcan explícitamente como `[inferido]`.
 
-## Gold — el panel (`dbt/`, DuckDB, 2026-08-08)
+Sobre eso corre un **contrato de datos** (Pandera) que valida cada fila antes de escribirla.
+Resultado real: de 179,179 filas procesadas, **98.9% pasan el contrato**. El resto queda en
+cuarentena con el motivo exacto documentado por archivo, no descartado en silencio.
 
-`dbt build` transforma los 88 parquet de Silver en el modelo dimensional completo que describe
-la arquitectura (sección 4.3): `fct_ppi_observacion` (tabla central, grano
-`(cve_cartera, snapshot_id)`), `dim_ppi` (SCD2 sobre nombre/ramo/UR/tipo/localización/coordenadas),
-`fct_ppi_delta` (cambio contra el corte anterior), `fct_ppi_ciclo_vida` (un renglón por PPI:
-sobrecosto %, duración, estatus terminal inferido), `dim_snapshot`, y 3 catálogos congelados
-(`dim_ramo`, `dim_entidad`, `dim_tipo_ppi`). Vive en `data/gold/panel_opa.duckdb` (36 MB, fuera de
-git -- ver "Almacenamiento de datos pesados" en la arquitectura: Gold se empaqueta y publica
-aparte, no directo en el repo). **40 de 40 tests pasan.**
+Salida: un Parquet por snapshot en `data/silver/` (78 MB).
 
-**El hallazgo más importante de esta fase: `(cve_cartera, snapshot_id)` -- el grano que la
-arquitectura asume como llave de la observación (sección 2.1) -- no es único en los datos crudos.**
-99.35% de los pares sí tienen una sola fila, pero ~1,124 pares tienen entre 2 y 33 filas para el
-mismo PPI en el mismo corte. Se investigaron dos casos reales: los montos (`MODIFICADO`,
-`EJERCIDO`) son valores genuinamente distintos entre filas del mismo grupo que suman a un total
-coherente, mientras que `avance_fisico` se repite igual en todas -- consistente con un "Programa"
-de cobertura multi-entidad exportado como una fila por sub-asignación, con un solo `cve_cartera`
-padre, no con filas repetidas por error. `int_ppi_observaciones_dedup.sql` sí resuelve esto:
-monetarios se **suman** (recupera el total real), `avance_fisico` se toma como **máximo** (es un
-porcentaje, sumarlo estaría mal), y los atributos descriptivos vienen de la sub-fila con el monto
-más grande -- lo cual pierde precisión geográfica real para un programa nacional, declarado vía
-`n_registros_agregados > 1` en vez de escondido.
+### Gold — el modelo dimensional
 
-Otros hallazgos reales de esta fase:
+`dbt` transforma los Parquet en el panel consultable, materializado en **DuckDB**:
 
-- **Un mismo trimestre puede tener 3 archivos complementarios, no duplicados** (Consolidado =
-  universo completo, Seguimiento = solo vigentes, Concluido = solo lo que terminó ese trimestre --
-  ver Fase 1). `int_snapshot_canonico.sql` elige uno por trimestre para los modelos que necesitan
-  orden cronológico, prefiriendo Consolidado. **2020 T1 y T2 solo tienen "Concluido" disponible**
-  -- su universo de PPI no es comparable al resto y queda marcado
-  (`cobertura_parcial_del_universo`) para no confundir un hueco de cobertura con un hallazgo real.
-- **`id_ramo` e `id_entidad_federativa` traían 11 y 3 códigos que no están en el catálogo oficial
-  vigente** (`catalogos.xlsx`) -- ramos de gobiernos anteriores ya reorganizados (ej. `13` =
-  Marina, `17` = Procuraduría General de la República) y códigos especiales de cobertura no
-  estatal (`33` = en el extranjero, `34` = no distribuible geográficamente, `35` = nacional). Las
-  descripciones se tomaron directo de la columna correspondiente del propio panel, no se
-  inventaron -- `dim_ramo`/`dim_entidad` quedaron ampliados con `en_catalogo_oficial` para
-  distinguir cuáles vienen del catálogo SHCP vigente.
-- **`estatus_operacion` y `descripcion_tipo_ppi` traen variantes de texto sin normalizar** de 11
-  años de fuente (`"Calendario Fiscal Concluido / Operación"` vs. `"...Concluido/Operación"` sin
-  espacios; `"En Proceso de Cancelación"` vs. `"En proceso de cancelación"`) -- 11 y 29 valores
-  distintos respectivamente. No hay un `id_tipo_ppi` numérico en los datos crudos que una
-  limpiamente contra el catálogo oficial de 11 valores. Los tests `accepted_values` fijan el
-  conjunto conocido hoy (para detectar valores *nuevos*, no para certificar que estén limpios) --
-  normalizar esto es trabajo pendiente, declarado, no una limpieza de Silver que ya se hizo.
-- **El test de "coherencia de montos" del dictamen original (`ejercido <= modificado * 1.05`)
-  tampoco se pudo usar aquí** para el singular de "estabilidad por ramo y corte" que pide la
-  arquitectura (sección 6.2) -- se probó contra datos reales y la suma de montos por ramo tiene
-  demasiado ruido legítimo (medianas de 0% pero swings normales de cientos de %) para detectar
-  cargas truncadas de forma confiable. Se implementó sobre **conteo de PPI por ramo** en su lugar
-  (más estable en condiciones normales), con `severity: warn`.
-- **Hallazgo real sobre el conteo de PPI por ramo (2026-08-08): la transición Q4→Q1 de cada año
-  es un patrón estacional estructural de la fuente SHCP, no una carga truncada.** El test de
-  estabilidad por ramo marcó 5 caídas ≥70% en un mismo build; se investigaron las 5 con datos
-  reales (consulta directa a `data/gold/panel_opa.duckdb`, cada conclusión revisada por un
-  segundo agente independiente con instrucción explícita de intentar refutarla). Resultado: el
-  universo TOTAL del padrón (todos los ramos juntos, no solo los marcados) cae de forma
-  sistemática entre 15% y 29% cada enero-marzo -- verificado en 2022, 2023, 2025 y 2026 --
-  probablemente porque los proyectos plurianuales vigentes se re-registran/reautorizan
-  presupuestalmente antes de volver a aparecer en el reporte trimestral. Ninguno de los 5 casos
-  fue un archivo incompleto sin explicación: 2 fueron ese mismo patrón estacional (con parte de
-  los proyectos "desaparecidos" reapareciendo intactos 1-2 trimestres después, mismo avance
-  físico), 1 fue una reorganización administrativa real -- Entidades no Sectorizadas perdió 31
-  de 41 proyectos porque IMSS-BIENESTAR obtuvo su propio ramo presupuestal (`id_ramo=56`, nuevo
-  en 2026 T1), ya dado de alta en `dim_ramo_seed.csv` -- y 1 fue probable depuración real de
-  estudios de preinversión estancados en 0% de avance (Turismo, 2025 T1). El test
-  (`assert_conteo_ppi_por_ramo_estable.sql`) se ajustó para excluir a propósito las
-  transiciones Q4→Q1 (fuente casi exclusiva de falsos positivos ya explicados por el ciclo
-  fiscal); sigue activo para cualquier otra transición de trimestre. Esto también le da un
-  mecanismo concreto a la alta volatilidad trimestral que motivó la consideración del panel
-  anual en Fase 0 -- no es ruido aleatorio, es el ciclo de reautorización de inicio de año.
-- **Deflactación (INPC de Banxico SIE, arquitectura sección 2.3) queda sin datos reales.** La API
-  de Banxico exige un token de autoservicio que no corresponde generar en automático, y no se
-  encontró un endpoint público sin token con la serie completa desde 2015. `conf/deflactor_inpc.csv`
-  tiene el esquema correcto (columnas `anio, trimestre, inpc, anio_base`) pero vacío --
-  `modificado_real`/`ejercido_real`/`monto_total_inversion_real` en `fct_ppi_observacion` existen
-  y funcionan, simplemente salen `NULL` hasta que alguien con acceso a un token de Banxico SIE
-  llene el CSV con la serie oficial. No se aproximó con un supuesto de inflación genérico.
+| Modelo | Qué es |
+|---|---|
+| `fct_ppi_observacion` | Tabla central. Un renglón por proyecto por corte. Todo lo demás se deriva de aquí. |
+| `dim_ppi` | SCD2 sobre atributos que cambian rara vez (nombre, ramo, unidad responsable, ubicación). Un renglón por periodo de vigencia. |
+| `fct_ppi_delta` | Cambio contra el corte anterior: Δmonto, Δavance, cambio de estatus, bandera de renombramiento. |
+| `fct_ppi_ciclo_vida` | Un renglón por proyecto: sobrecosto %, duración, estatus terminal inferido. |
+| `dim_snapshot` | Metadatos y procedencia de cada corte, incluidos los que se excluyeron y por qué. |
+| `dim_ramo`, `dim_entidad`, `dim_tipo_ppi` | Catálogos, ampliados con códigos históricos que ya no están en el catálogo oficial vigente. |
 
-## Alineación a los Lineamientos de Datos Abiertos de la ATDT (`docs/`, 2026-08-08)
+**40 de 40 tests pasan**, incluidos tres tests personalizados que codifican reglas de negocio
+reales (unicidad del grano, avance físico decreciente con bandera, estabilidad de conteo por
+ramo).
 
-El 11/09/2025 la Agencia de Transformación Digital y Telecomunicaciones (ATDT) publicó en el
-DOF los ["Lineamientos en materia de Datos Abiertos de la Administración Pública
-Federal"](docs/normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md) (PDF original
-también en `docs/normativa/`) -- el estándar técnico vigente para datos abiertos federales en
-México (DCAT, diccionario de datos, metadatos de procedencia y calidad). **Este repo no es una
-Institución Publicante** (los Lineamientos obligan a la APF, no a un proyecto ciudadano), pero
-el plan documentado en
-[`docs/PLAN-alineacion-gold-lineamientos-ATDT.md`](docs/PLAN-alineacion-gold-lineamientos-ATDT.md)
-adopta voluntariamente la parte técnica -- porque es el estándar de calidad correcto y porque
-deja el dataset listo para integrarse a la Plataforma Nacional de Datos Abiertos si algún actor
-institucional lo retoma. Verificado en vivo contra la API de `datos.gob.mx` (2026-08-08): el
-panel OPA/PPI **no está duplicado** en la plataforma nacional -- 0 resultados para "Obra
-Pública Abierta" o "programas y proyectos de inversión", y no existe ninguna organización de
-Hacienda/SHCP entre las 25 registradas en el catálogo (reconstruido por la ATDT entre
-septiembre y diciembre de 2025).
+### Publicación — el paquete distribuible
 
-**Fase A -- Diccionario de datos, completa.** `dbt/models/marts/schema.yml` es ahora la fuente
-única de las ~80 columnas publicables de las 8 tablas de Gold (antes 10 documentadas, el resto
-sin descripción). `opa diccionario` cruza ese schema contra las columnas REALES del duckdb y
-**falla ruidoso** (no advierte, se detiene) si aparece una columna sin descripción o una
-descripción de una columna que ya no existe -- la deriva entre documentación y datos es un
-error, igual que el resto de este pipeline. Escribe `reports/diccionario/` (versionado en git,
-igual que el resto de `reports/`): un `diccionario_datos_{tabla}.csv` por tabla y un
-`DICCIONARIO.md` consolidado.
+`opa publish` empaqueta el panel en formatos abiertos, de forma **determinista**: el mismo DuckDB
+produce siempre los mismos bytes, verificado corriendo dos veces y comparando.
 
-**Fase B -- Exportador de distribuciones, completa.** `opa publish` escribe
-`data/publish/{version}/` (fuera de git, mismo criterio que bronze/silver/gold) con las 8
-tablas en CSV (RFC 4180, formato base que exigen los Lineamientos) y Parquet, más GeoJSON
-(RFC 7946, un `FeatureCollection` por año de corte) como el extra de este proyecto sobre las
-tablas georreferenciadas, y `checksums.sha256` verificable con `shasum -a 256 -c`. Construida
-con 3 módulos independientes vía workflow multi-agente (implementación + revisión adversarial
-por módulo, que encontró y corrigió 2 bugs reales: CSV sin CRLF pese a prometer RFC 4180, y
-checksums ordenados por hash en vez de por ruta) e integrada a mano en el CLI. El GeoJSON viene
-enriquecido con `nombre_ppi`/`descripcion_ur`/`localizacion` (de `dim_ppi`, unido por el rango
-de vigencia SCD2 -- no la versión más reciente) más `trimestre_corte`, `fase` y los montos
-`aprobado`/`ppef`/`pef`: 96.4% de los puntos de 2021 traen nombre real de proyecto. Verificado
-contra el duckdb real: 30 archivos, checksums en verde, y una segunda corrida produce bytes
-**idénticos** a la primera -- el determinismo se comprobó, no se asumió.
+- **CSV** (RFC 4180) — el formato base que exigen los Lineamientos de datos abiertos.
+- **Parquet** — mismo contenido con tipos preservados, para análisis sin re-parseo.
+- **GeoJSON** (RFC 7946) — un `FeatureCollection` por año, listo para QGIS/Leaflet sin ETL previo.
+- **`catalog.json`** — catálogo DCAT (JSON-LD) con metadatos, procedencia y calidad reales.
+- **`NOTA-TECNICA.md`** — limitaciones conocidas, viajando *con* los datos, no solo en el repo.
+- **`checksums.sha256`** — integridad de todo lo anterior, incluidos el catálogo y la nota.
 
-**Fase C -- Catálogo DCAT, completa.** `opa publish` ahora también escribe
-`data/publish/{version}/catalog.json`, un catálogo DCAT (JSON-LD, vocabulario W3C estándar
-`dcat:`/`dct:`/`foaf:`/`spdx:` -- ver `conf/dcat.yml` para lo declarativo) con un
-`dcat:Dataset` por tabla y un `dcat:Distribution` por archivo real (tamaño y sha256
-calculados sobre el archivo, no inventados). Los 13 GeoJSON se adjuntan al dataset
-`fct_ppi_observacion`, de donde se derivan, en vez de aparecer como datasets sueltos.
-También incluye `x-procedencia` y `x-calidad` -- resúmenes reales de `data/manifest.jsonl` y
-`reports/calidad_silver.md` bajo un prefijo `x-` explícito, porque no son vocabulario DCAT
-oficial (el Manual Operativo de la ATDT sigue sin publicarse). Construida con 4 agentes
-coordinados en 2 etapas (dos módulos independientes en paralelo + revisión adversarial cada
-uno, luego el generador que depende de ambos + su propia revisión) e integrada a mano en el
-CLI, con `checksums.sha256` corriendo al final para cubrir también `catalog.json`. Verificado
-contra el paquete real: 8 datasets, 15 distribuciones en `fct_ppi_observacion`, checksums en
-verde, y el paquete completo produce bytes idénticos en una segunda corrida.
+## El stack, y por qué
 
-**Fase D -- Contexto, privacidad y empaquetado final, completa.** Evaluación de datos
-personales (Art. 38-VI) contra los datos reales de `dim_ppi` (`nombre_ppi`, `descripcion_ur`,
-`localizacion`): 2 investigaciones independientes con metodologías distintas (barrido
-heurístico por patrón de nombre + honoríficos, y muestreo aleatorio con vocabulario de
-exclusión sobre los valores atípicos) más una verificación adversarial que buscó
-específicamente los huecos que ninguna de las dos cubría (apellidos sueltos, vocabulario de
-sucesión/propiedad, patrones RFC/CURP) -- más de 1,300 valores distintos inspeccionados a
-mano. **Resultado: sin datos personales encontrados.** `opa publish` ahora también escribe
-`data/publish/{version}/NOTA-TECNICA.md`, que empaqueta ese veredicto junto con las demás
-limitaciones ya documentadas de este dataset (patrón estacional Q4→Q1, 2024 T1 corrupto en la
-fuente, cobertura parcial 2020 T1/T2, los 7 trimestres-hueco reales, deflactación pendiente,
-variantes de texto sin normalizar) -- con los números citados vía `resumen_procedencia()`/
-`resumen_calidad()` (Fase C, reutilizadas, no reimplementadas) para que nunca se desactualicen
-en silencio. `checksums.sha256` corre al final del pipeline y cubre también este archivo.
+| Herramienta | Para qué | Por qué esa |
+|---|---|---|
+| **Python 3.12 + `uv`** | Ingesta, normalización, CLI | `uv` resuelve el entorno de forma reproducible y rápida, sin `requirements.txt` a mano |
+| **httpx** (+ fallback a `curl`) | Descarga | Ver la nota de TLS más abajo — el fallback resuelve un problema real del servidor de la SHCP |
+| **pandas + pyarrow** | Transformación y Parquet | Estándar para este volumen; no hace falta Spark para 180 mil filas |
+| **Pandera** | Contrato de datos en Silver | Valida por esquema declarativo y separa filas válidas de cuarentena sin perder el motivo |
+| **dbt + DuckDB** | Capa Gold | SQL versionado, con linaje y tests como parte del build. DuckDB da un panel analítico en un solo archivo, sin servidor |
+| **Typer + Rich** | CLI | Un comando por etapa, salida legible |
+| **pytest + ruff** | Pruebas y linting | 138 tests, CI en GitHub Actions |
 
-Con esto, las 4 fases del plan quedan completas. **Fuera de alcance de este README, pendiente
-de una decisión explícita:** publicar el paquete versionado como GitHub Release, Hugging Face
-y un DOI de Zenodo (ver la sección "Cómo citar" más abajo) -- son acciones de publicación
-pública que requieren autorización y credenciales que este trabajo no asume por su cuenta.
+Decisión de diseño transversal: **fallar ruidoso**. Si aparece un esquema no mapeado, una columna
+sin documentar o un insumo faltante, el proceso sale con código 1 en vez de continuar con datos
+parciales. Vale más un build roto que un dataset silenciosamente incompleto.
 
-## Cómo correr Fase 0 + Bronze + Silver + Gold
+## Hallazgos reales
 
-Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
+Lo que se aprendió reconstruyendo esto — y que no estaba en ninguna documentación:
+
+**El hueco 2022–2026 no era una descontinuación, era un cambio de nombre.** El portal migró a una
+aplicación Next.js y renombró los archivos trimestrales dentro de la *misma* carpeta que ya se
+recorría: de `reporteOPA{n}Trimestre.xlsx` a una familia nueva de `Consolidado…`, `Seguimiento…` y
+`Concluido(s)…`. La pluralización de este último alterna por año sin regla clara: hay que probar
+ambas formas.
+
+**Un mismo trimestre puede tener tres archivos que no son duplicados.** Consolidado es el universo
+completo, Seguimiento solo los vigentes, Concluido solo lo que terminó ese trimestre. Confundirlos
+produce comparaciones sin sentido. 2020 T1 y T2 *solo* tienen Concluido disponible, así que su
+universo no es comparable con el resto — queda marcado en el modelo para no confundir un hueco de
+cobertura con un hallazgo real.
+
+**Las etiquetas del portal no son confiables sin verificar el contenido.** El manifiesto oficial
+etiquetaba `opa_trimestral.csv` como "Primer trimestre 2019", y el archivo vive en la carpeta
+`/2019/` — pero al abrirlo, el 100% de sus filas trae `CICLO=2018`. Es un archivo de otro ciclo
+fiscal mal ubicado por el propio portal. El T1 2019 real se encontró por analogía de patrón, no
+por el manifiesto.
+
+**Hay datos corruptos en la fuente misma.** Los tres archivos de 2024 T1 se sirven como binario
+OLE2 (Excel antiguo) con extensión `.csv` y `Content-Type: text/csv`, truncados. El
+`Content-Length` del servidor coincide con lo descargado —no es un problema de la descarga— y no
+hay captura alterna en Wayback. Bronze los conserva como evidencia; Silver los rechaza
+explícitamente.
+
+**El `0` en las coordenadas no era basura, era un centinela.** El primer intento de normalización
+daba 78% de filas válidas; casi todo el rechazo eran coordenadas fuera del bbox de México en los
+esquemas de 2015–2018. Resultó que `0` significa "sin coordenadas" en el esquema viejo —48.6% de
+las latitudes de 2015 son literalmente cero— y (0°N, 0°E) es imposible en México de cualquier
+forma. Tratarlo como nulo antes de validar subió el resultado a **98.9%**. La diferencia fue un
+hallazgo sobre los datos, no un ajuste cosmético del contrato.
+
+**El grano que la arquitectura asumía no era único.** `(cve_cartera, snapshot_id)` tiene una sola
+fila en el 99.35% de los casos, pero ~1,124 pares traen entre 2 y 33 filas. Investigando dos casos
+reales: son programas de cobertura multi-entidad exportados como una fila por sub-asignación, con
+un solo proyecto padre. La deduplicación suma los montos, toma el **máximo** del avance físico
+(sumar un porcentaje estaría mal), y declara el colapso con `n_registros_agregados > 1` en vez de
+esconderlo.
+
+**La caída de proyectos cada enero no era un error de carga.** Un test de estabilidad marcó cinco
+caídas de ≥70% en el conteo de proyectos por ramo. Se investigaron las cinco contra los datos, con
+verificación adversarial independiente. Resultado: el padrón *completo* cae entre 15% y 29% cada
+primer trimestre, todos los años (verificado en 2022, 2023, 2025 y 2026) — es el ciclo de
+re-registro presupuestal de proyectos plurianuales al abrir el ejercicio fiscal. De los cinco
+casos, ninguno era un archivo truncado: dos eran ese patrón estacional, uno era una
+reorganización administrativa real (IMSS-BIENESTAR obtuvo ramo presupuestal propio en 2026 T1) y
+uno era probable depuración de estudios de preinversión estancados. El test se ajustó para
+excluir la transición Q4→Q1 y sigue activo para el resto.
+
+**Nota de entorno:** tanto `transparenciapresupuestaria.gob.mx` como `datos.gob.mx` sirven una
+cadena de certificados TLS incompleta (rotaron su intermedio de Let's Encrypt pero el servidor no
+lo envía). `httpx`/OpenSSL no hacen *AIA chasing* y fallan con `CERTIFICATE_VERIFY_FAILED`;
+`curl` sí resuelve la cadena vía el almacén del sistema. `discovery.py` tiene un fallback a `curl`
+para este caso exacto — **sin desactivar la verificación TLS**.
+
+## Limitaciones conocidas
+
+Declaradas a propósito, y empaquetadas junto con los datos en `NOTA-TECNICA.md`:
+
+- **7 trimestres siguen sin recuperarse**: 2016 T1/T2/T4, 2017 T4, 2018 T1/T2/T4. Agotadas cuatro
+  vías independientes de descubrimiento; el siguiente paso realista es una solicitud PNT/INAI a la
+  SHCP, no más automatización.
+- **`estatus_terminal_inferido` es una inferencia, no un dato oficial.** De los 11,025 proyectos,
+  6,785 quedan como `salida_no_explicada`: desaparecieron del padrón sin llegar a 95% de avance.
+  Eso puede significar cancelación real *o* que cayeron en uno de los trimestres que no se
+  recuperaron — los datos abiertos no permiten distinguirlo.
+- **La deflactación está pendiente.** Las columnas de montos reales existen pero salen `NULL`
+  hasta que se cargue la serie de INPC de Banxico SIE (requiere un token de autoservicio). No se
+  aproximó con un supuesto de inflación genérico.
+- **`ejercido` y `modificado` no son directamente comparables.** El check de coherencia esperado
+  falla en 18.5% de las filas reales, por márgenes de cientos de veces, no de redondeo — probable
+  mezcla de un acumulado del proyecto contra un monto del ciclo vigente. Queda como pregunta
+  abierta documentada, no como un check con tolerancia inflada para que pase.
+- **Hay variantes de texto sin normalizar** en `estatus_operacion` y `descripcion_tipo_ppi` (11 y
+  29 valores distintos, con diferencias de mayúsculas y espaciado de once años de captura). Los
+  tests fijan el conjunto conocido hoy para detectar valores *nuevos*, no para certificar que
+  estén limpios.
+
+## Alineación a los Lineamientos de Datos Abiertos (ATDT)
+
+El 11/09/2025 la Agencia de Transformación Digital y Telecomunicaciones publicó en el DOF los
+[Lineamientos en materia de Datos Abiertos de la APF](docs/normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md)
+(transcripción completa y PDF original en `docs/normativa/`), que sustituyeron la política que
+antes coordinaba el INAI.
+
+**Este repositorio no es una Institución Publicante** —los Lineamientos obligan a la
+Administración Pública Federal, no a un proyecto ciudadano— pero adopta voluntariamente su parte
+técnica, documentada en [`docs/PLAN-alineacion-gold-lineamientos-ATDT.md`](docs/PLAN-alineacion-gold-lineamientos-ATDT.md):
+diccionario de datos, formatos tabulares abiertos, catálogo DCAT, metadatos de procedencia y
+calidad, y nota técnica de contexto. Las obligaciones institucionales (Área Coordinadora, Plan
+Institucional de Publicación) quedan explícitamente fuera de alcance: no se simula un
+cumplimiento que no corresponde.
+
+Dos notas relevantes, verificadas en vivo el 2026-08-08:
+
+- **El panel no está duplicado en la Plataforma Nacional de Datos Abiertos.** Cero resultados para
+  "Obra Pública Abierta" o "programas y proyectos de inversión" en el catálogo de `datos.gob.mx`,
+  y no hay ninguna organización de Hacienda/SHCP entre las registradas.
+- **El Manual Operativo de la ATDT —donde se definirán formatos y estructuras exactos— aún no se
+  publica.** Por eso el catálogo usa vocabulario DCAT estándar del W3C y no un "perfil mexicano"
+  inventado; los resúmenes propios de este repo viajan bajo claves con prefijo `x-` explícito,
+  claramente separados del vocabulario oficial.
+
+## Cómo correr el pipeline
+
+Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (que `uv` gestiona solo).
 
 ```bash
-# UV_NO_EDITABLE evita un problema de instalación editable observado en algunos
-# entornos sandbox (el .pth de instalación editable no se procesa). No hace
-# falta en una máquina normal, pero tampoco estorba -- uv run vuelve a
-# sincronizar el entorno en cada invocación, así que se exporta una sola vez.
-export UV_NO_EDITABLE=1
 uv sync
 
-# Descubrimiento: prueba ~480 URLs candidatas contra la SHCP (a 1 req/2s, ≈45-50 min
-# en la práctica), consulta el mirror CKAN de datos.gob.mx y la CDX API de Wayback.
-# Escribe reports/discovery.jsonl y reports/cobertura.md.
+# 1. Descubrimiento: prueba ~480 URLs candidatas contra la SHCP (1 req/2s, ≈45-50 min),
+#    consulta la CDX API de Wayback. → reports/discovery.jsonl, reports/cobertura.md
 uv run opa discover
 
-# Descarga 3 snapshots representativos (más antiguo, ~2019-2020, más reciente)
-# a data/muestras/ e inspecciona sus esquemas en reports/esquemas.md.
-uv run opa inspect
-
-# Bronze: descarga completa (no solo metadatos) de todo lo que discover encontró con
-# existe=True y extensión de datos real (csv/xlsx/json) -- ~164 candidatas, ≈10 min a 1
-# req/2s. Escribe data/bronze/ (crudo, fuera de git) y data/manifest.jsonl (procedencia,
-# versionado). Idempotente: correrlo de nuevo solo descarga lo que falte.
+# 2. Bronze: descarga completa de lo recuperable. → data/bronze/, data/manifest.jsonl
+#    Idempotente: correrlo de nuevo solo baja lo que falte.
 uv run opa bronze
 
-# Silver: normaliza cada snapshot con esquema conocido (conf/schema_map.yml) a parquet
-# canónico -- sin red, todo local. Escribe data/silver/*.parquet (fuera de git) y
-# reports/calidad_silver.md. Sale con código 1 si aparece un esquema no mapeado o un
-# error de lectura (falla ruidoso a propósito, ver ARQUITECTURA sección 5.3).
+# 3. Silver: normaliza a Parquet canónico con contrato de datos, sin red.
+#    → data/silver/*.parquet, reports/calidad_silver.md
 uv run opa normalize
 
-# Gold: seeds + modelos dbt + tests, todo en un solo comando. Escribe
-# data/gold/panel_opa.duckdb (fuera de git). --project-dir y --profiles-dir son
-# necesarios porque dbt/ no es la raíz del repo.
+# 4. Gold: seeds + modelos + tests de dbt. → data/gold/panel_opa.duckdb
 dbt build --project-dir dbt --profiles-dir dbt
 
-# Diccionario de datos (Fase A de la alineación a Lineamientos ATDT, ver arriba). Falla
-# ruidoso si hay columnas reales sin documentar en dbt/models/marts/schema.yml. Escribe
-# reports/diccionario/ (versionado en git).
+# 5. Diccionario de datos, derivado del schema.yml de dbt. → reports/diccionario/
 uv run opa diccionario
 
-# Publicación de distribuciones (Fase B) + catálogo DCAT (Fase C) + nota técnica (Fase D).
-# CSV + Parquet + GeoJSON + catalog.json (DCAT) + NOTA-TECNICA.md + checksums.sha256 (cubre
-# también catalog.json y NOTA-TECNICA.md) en data/publish/{version}/ (fuera de git) --
-# version por defecto = corte más reciente del duckdb (ej. 2026T1), o pasa --version explícito.
+# 6. Paquete publicable: CSV + Parquet + GeoJSON + DCAT + nota + checksums.
+#    → data/publish/{version}/   (versión por defecto = corte más reciente del panel)
 uv run opa publish
 ```
 
-Reportes producidos:
+Los pasos 1–3 son opcionales si solo se quiere el panel: el
+[release publicado](https://github.com/iChocko/panel-obra-publica-mx/releases/tag/datos-2026T1)
+ya trae el resultado final.
 
-| Archivo | Contenido |
-|---|---|
-| `reports/discovery.jsonl` | Un renglón por URL/consulta probada, con resultado crudo |
-| `reports/cobertura.md` | Matriz año × trimestre (vivo / espejo / wayback / hueco) y recomendación |
-| `reports/esquemas.md` | Comparación de columnas y calidad entre las 3 muestras descargadas |
-| `data/manifest.jsonl` | Un renglón por snapshot bronze: url, origen, sha256, corte declarado, header_hash |
-| `reports/calidad_silver.md` | Un renglón por snapshot normalizado: filas válidas/rechazadas y por qué |
-| `data/gold/panel_opa.duckdb` | Base DuckDB con el modelo dimensional completo -- consultable con cualquier cliente SQL de DuckDB |
+## Estructura del repositorio
 
-## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze + Silver + Gold)
+```
+conf/           Configuración declarativa: patrones de URL, mapeo de esquemas,
+                metadatos DCAT, serie de deflactor
+src/opa/        Paquete Python: discovery, bronze, normalize, diccionario,
+                y los cuatro módulos de publicación (tabular/geojson/dcat/nota)
+dbt/            Capa Gold: staging → intermediate → marts, seeds y tests
+tests/          138 tests (pytest)
+reports/        Salidas versionadas: cobertura, esquemas, calidad, diccionario
+docs/           Normativa ATDT (PDF + transcripción) y plan de alineación
+data/           Bronze, Silver, Gold y paquetes publicados (fuera de git,
+                salvo manifest.jsonl)
+```
 
-Reconocimiento completo (inventario de URLs, matriz de cobertura, inspección de esquemas), Bronze
-(todos los snapshots recuperables descargados completos, hasheados y con procedencia
-documentada), Silver (`conf/schema_map.yml`, `src/opa/contracts.py`, `src/opa/normalize.py` --
-98.9% de las filas reales validadas), y Gold (`dbt/`: `fct_ppi_observacion`, `dim_ppi` SCD2,
-`fct_ppi_delta`, `fct_ppi_ciclo_vida`, catálogos, 39/40 tests). **Pendiente para una sesión
-futura:** la serie real de INPC de Banxico SIE para deflactación (requiere un token que no
-corresponde generar en automático -- ver la sección de Gold arriba), normalizar las variantes de
-texto de `estatus_operacion`/`descripcion_tipo_ppi`, y la capa de publicación (MkDocs,
-DuckDB-WASM, servidor MCP, Zenodo/Hugging Face) descrita en la arquitectura.
+Documentos de diseño: [`viabilidad_tecnica`](viabilidad_tecnica) (dictamen inicial) y
+[`ARQUITECTURA-panel-obra-publica-mx.md`](ARQUITECTURA-panel-obra-publica-mx.md) (arquitectura
+completa). El README documenta lo que *se construyó*; esos documentos, lo que *se planeó* — las
+diferencias entre ambos están anotadas arriba, en Hallazgos.
 
 ## Licencia
 
-El código de este repositorio está bajo licencia [MIT](LICENSE).
+El **código** está bajo licencia [MIT](LICENSE).
 
-Los **datos** de OPA son un conjunto separado, sujeto a los **Términos de Libre Uso MX**
+Los **datos** son un conjunto separado, sujeto a los **Términos de Libre Uso MX**
 (datos.gob.mx/libreusomx) bajo el "Decreto por el que se establece la regulación en materia de
 Datos Abiertos" (DOF 20/02/2015). Toda redistribución debe citar: nombre del conjunto de datos,
 siglas de la dependencia (SHCP), liga de los datos descargados y fecha de consulta en formato
@@ -451,21 +322,14 @@ siglas de la dependencia (SHCP), liga de los datos descargados y fecha de consul
 
 ## Cómo citar
 
-Los Términos de Libre Uso MX (arriba) piden 4 elementos en toda redistribución. Para el paquete
-que genera `opa publish` (`data/publish/{version}/`):
-
 > Panel Histórico de Obra Pública Federal (México), reconstruido de Obra Pública Abierta (OPA),
 > Secretaría de Hacienda y Crédito Público (SHCP).
-> https://github.com/iChocko/panel-obra-publica-mx -- versión `{version}` (ej. `2026T1`).
+> https://github.com/iChocko/panel-obra-publica-mx — versión `2026T1`.
 > Fecha de consulta: `AAAA-MM-DD`.
 
-El paquete mismo trae todo lo necesario para verificar y citar con precisión sin depender de
-este README: `catalog.json` (metadatos DCAT completos, procedencia y calidad reales -- Fase C),
-`NOTA-TECNICA.md` (limitaciones conocidas del dataset -- Fase D) y `checksums.sha256`
-(integridad de cada archivo, cubre también `catalog.json` y `NOTA-TECNICA.md`).
+El paquete publicado trae todo lo necesario para verificar y citar sin depender de este README:
+`catalog.json` (metadatos DCAT completos), `NOTA-TECNICA.md` (limitaciones conocidas) y
+`checksums.sha256` (integridad de cada archivo).
 
-**Pendiente, fuera del alcance de este README:** publicar el paquete versionado como GitHub
-Release, y después en Hugging Face con un DOI de Zenodo (identificador permanente, Art. 5-VI de
-los Lineamientos ATDT) -- son acciones de publicación pública que requieren una decisión
-explícita de a quién le pertenece el repo y credenciales de las plataformas correspondientes,
-no algo que se automatice sin esa autorización.
+**Pendiente:** espejo en Hugging Face y DOI de Zenodo para identificador permanente
+(Art. 5-VI de los Lineamientos).
