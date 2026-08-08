@@ -32,8 +32,11 @@ columnas_canonicas:
   localizacion: "Localización textual libre."
   id_entidad_federativa: "Clave de entidad federativa (INEGI)."
   entidad_federativa: "Nombre de la entidad federativa."
-  latitud: "Latitud del proyecto."
-  longitud: "Longitud del proyecto."
+  latitud: "Latitud del proyecto. OJO: en el esquema viejo (2015-2018) '0' es un centinela
+    real de 'sin coordenadas' -- 48.6% de LATITUD_INICIAL en 2015 es literalmente 0
+    (verificado). normalize.py lo convierte a nulo antes de validar; no tratarlo como (0,0)
+    real en ningún cálculo aguas abajo."
+  longitud: "Longitud del proyecto. Mismo centinela '0' que latitud, ver esa nota."
   fecha_inicio_cal_ff: "Fecha de inicio (calendario físico-financiero)."
   fecha_fin_cal_ff: "Fecha de fin (calendario físico-financiero)."
   anios_he: "Años de horizonte de ejecución declarados."

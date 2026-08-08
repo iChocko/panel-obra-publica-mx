@@ -186,10 +186,31 @@ Probado de punta a punta contra un archivo bronze real completo (2021, 1786 fila
 detecta correctamente los 13 valores `cve_cartera` centinela y 11 puntos fuera del bbox, sin
 falsos positivos en el resto.
 
-**No incluye `normalize.py` todavía** -- `schema_map.yml` y `contracts.py` son el contrato de
-entrada a Silver, no la transformación bronze → parquet en sí. Eso es el siguiente paso de Fase 2.
+### `normalize.py` -- bronze → parquet canónico
 
-## Cómo correr Fase 0 + Bronze
+`uv run opa normalize` corrió sobre los 91 snapshots únicos con corte declarado (128 archivos
+menos duplicados de contenido y los 3 corruptos de 2024 T1): **88 normalizados, 0 con esquema
+desconocido, 0 con error de lectura.** De 179,179 filas procesadas, **98.9% pasaron el contrato
+(177,245)** -- el resto quedó en cuarentena (excluido del parquet, no descartado en silencio: el
+motivo exacto por archivo está en `reports/calidad_silver.md`).
+
+**El primer intento dio 78.0% de filas válidas, no 98.9% -- la diferencia fue un hallazgo real,
+no un ajuste cosmético del contrato.** Casi todo el rechazo inicial (43,341 de 196,910 filas) caía
+en `latitud`/`longitud` fuera del bbox de México, concentrado casi por completo en los esquemas
+de 2015-2018. La causa: **`'0'` es un centinela real de "sin coordenadas" en el esquema viejo**
+-- 48.6% de `LATITUD_INICIAL` en 2015 es literalmente `0` (verificado), y (0°N, 0°E) es
+geográficamente imposible en México de cualquier forma. El esquema moderno no usa esa convención
+(0 apariciones en 2021). `normalize.py` ahora trata `0` como nulo en `latitud`/`longitud` antes de
+validar -- documentado en `conf/schema_map.yml`. También se encontraron **4 formatos de fecha
+distintos** en el corpus (`2003-01-01 00:00:00`, `01/12/2002`, `mar-06`, `Enero/2001`), todos de
+precisión de mes -- ni el formato moderno `DD/MM/YYYY` tiene día real, siempre trae `01`
+(verificado sobre 2021 completo). `parsear_fecha_mes()` reconoce las 4; un quinto formato no
+reconocido se cuenta y reporta, no se adivina.
+
+Parquet, un archivo por snapshot, en `data/silver/` (78 MB, fuera de git igual que `data/bronze/`).
+Nombre de archivo = `snapshot_id` (ej. `2021Q3_ae02c33e.parquet`).
+
+## Cómo correr Fase 0 + Bronze + Silver
 
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
 
@@ -215,6 +236,12 @@ uv run opa inspect
 # req/2s. Escribe data/bronze/ (crudo, fuera de git) y data/manifest.jsonl (procedencia,
 # versionado). Idempotente: correrlo de nuevo solo descarga lo que falte.
 uv run opa bronze
+
+# Silver: normaliza cada snapshot con esquema conocido (conf/schema_map.yml) a parquet
+# canónico -- sin red, todo local. Escribe data/silver/*.parquet (fuera de git) y
+# reports/calidad_silver.md. Sale con código 1 si aparece un esquema no mapeado o un
+# error de lectura (falla ruidoso a propósito, ver ARQUITECTURA sección 5.3).
+uv run opa normalize
 ```
 
 Reportes producidos:
@@ -225,16 +252,17 @@ Reportes producidos:
 | `reports/cobertura.md` | Matriz año × trimestre (vivo / espejo / wayback / hueco) y recomendación |
 | `reports/esquemas.md` | Comparación de columnas y calidad entre las 3 muestras descargadas |
 | `data/manifest.jsonl` | Un renglón por snapshot bronze: url, origen, sha256, corte declarado, header_hash |
+| `reports/calidad_silver.md` | Un renglón por snapshot normalizado: filas válidas/rechazadas y por qué |
 
-## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze + inicio de Silver)
+## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze + Silver)
 
 Reconocimiento completo (inventario de URLs, matriz de cobertura, inspección de esquemas), la
 ingesta de Bronze (todos los snapshots recuperables descargados completos, hasheados y con
-procedencia documentada), y el arranque de Silver: `conf/schema_map.yml` (11 esquemas reales
-mapeados) y `src/opa/contracts.py` (contrato Pandera corregido con evidencia real). **No hay
-`normalize.py` ni modelos Gold todavía** -- la transformación bronze → parquet canónico y las
-fases siguientes están descritas en el documento de arquitectura, pendientes de una sesión
-futura.
+procedencia documentada), y Silver completo: `conf/schema_map.yml` (11 esquemas reales
+mapeados), `src/opa/contracts.py` (contrato Pandera corregido con evidencia real) y
+`src/opa/normalize.py` (bronze → parquet canónico, 98.9% de las filas reales validadas). **No hay
+modelos Gold todavía** -- dbt, SCD2 sobre `dim_ppi`, y las fases siguientes descritas en el
+documento de arquitectura quedan pendientes de una sesión futura.
 
 ## Licencia
 

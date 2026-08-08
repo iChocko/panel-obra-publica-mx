@@ -16,6 +16,7 @@ import typer
 from rich.console import Console
 
 from opa import discovery, manifest
+from opa import normalize as normalize_mod
 
 app = typer.Typer(help="Fase 0 -- reconocimiento del panel histórico OPA.")
 console = Console()
@@ -24,9 +25,11 @@ RUTA_CONFIG = Path("conf/sources.yml")
 RUTA_DISCOVERY_JSONL = Path("reports/discovery.jsonl")
 RUTA_COBERTURA_MD = Path("reports/cobertura.md")
 RUTA_ESQUEMAS_MD = Path("reports/esquemas.md")
+RUTA_CALIDAD_SILVER_MD = Path("reports/calidad_silver.md")
 DIR_MUESTRAS = Path("data/muestras")
 DIR_AUXILIARES = Path("data/auxiliares")
 DIR_BRONZE = Path("data/bronze")
+DIR_SILVER = Path("data/silver")
 RUTA_MANIFEST_JSONL = Path("data/manifest.jsonl")
 
 TIMEOUT_DESCARGA_SEGUNDOS = 60.0
@@ -182,6 +185,49 @@ def bronze() -> None:
     )
     console.print(f"  Bronze:     {DIR_BRONZE}/")
     console.print(f"  Manifiesto: {RUTA_MANIFEST_JSONL}")
+
+
+# --------------------------------------------------------------------------
+# Silver -- normalización a esquema canónico (Fase 2, ver src/opa/normalize.py)
+# --------------------------------------------------------------------------
+
+
+@app.command()
+def normalize() -> None:
+    """Bronze -> Silver: normaliza a parquet los snapshots con esquema conocido en conf/schema_map.yml.
+
+    Falla ruidoso (código de salida 1) si aparece un esquema no mapeado o un error de
+    lectura -- ver ARQUITECTURA sección 5.3. Los snapshots que sí se normalizan quedan
+    escritos aunque otros fallen: no se pierde trabajo bueno por uno malo.
+    """
+    resultados = normalize_mod.ejecutar_normalizacion(
+        ruta_manifest=RUTA_MANIFEST_JSONL, ruta_schema_map=Path("conf/schema_map.yml"),
+        dir_bronze=DIR_BRONZE, dir_silver=DIR_SILVER,
+    )
+    reporte_md = normalize_mod.generar_reporte_calidad(resultados)
+    RUTA_CALIDAD_SILVER_MD.parent.mkdir(parents=True, exist_ok=True)
+    RUTA_CALIDAD_SILVER_MD.write_text(reporte_md, encoding="utf-8")
+
+    ok = [r for r in resultados if r.estado == "ok"]
+    corruptos = [r for r in resultados if r.estado == "corrupto_conocido"]
+    desconocidos = [r for r in resultados if r.estado == "esquema_desconocido"]
+    errores = [r for r in resultados if r.estado == "error"]
+
+    console.print(f"[bold green]Silver: {len(ok)} snapshots normalizados[/] de {len(resultados)} candidatos.")
+    console.print(f"  Omitidos por corrupción conocida: {len(corruptos)}")
+    if desconocidos:
+        console.print(f"[bold red]{len(desconocidos)} con esquema DESCONOCIDO -- no están en conf/schema_map.yml:[/]")
+        for r in desconocidos:
+            console.print(f"  - {r.archivo_bronze}")
+    if errores:
+        console.print(f"[bold red]{len(errores)} con error de lectura:[/]")
+        for r in errores:
+            console.print(f"  - {r.archivo_bronze}: {r.detalle_error}")
+    console.print(f"  Silver:  {DIR_SILVER}/")
+    console.print(f"  Reporte: {RUTA_CALIDAD_SILVER_MD}")
+
+    if desconocidos or errores:
+        raise typer.Exit(code=1)
 
 
 # --------------------------------------------------------------------------
