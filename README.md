@@ -16,7 +16,7 @@ completa del proyecto) para el detalle.
 
 ## Estado: Fase 0 + Fase 1 — Reconocimiento y resolución de huecos (2026-08-08)
 
-**Recuperabilidad trimestral 2016–2024: 28 / 36 (77.8%) → por encima del 70%.**
+**Recuperabilidad trimestral 2016–2024: 29 / 36 (80.6%) → por encima del 70%.**
 
 **Recomendación: panel trimestral completo, alcance original** -- no el pivote a panel anual que
 había recomendado la primera corrida, ni siquiera el panel parcial de la segunda. Detalle completo
@@ -26,9 +26,14 @@ en [`reports/cobertura.md`](reports/cobertura.md).
 > (11.1%) y recomendó pivotar a panel anual. Fase 1 (2026-08-08) resolvió por qué 2022-2026 no
 > respondía (cambio de nombre de archivo, no descontinuación) y subió la cifra a 22/36 (61.1%,
 > panel parcial). Una segunda ronda de Fase 1 el mismo día resolvió además 2019 completo y 2020
-> T3/T4 vía nomenclatura irregular confirmada en el manifiesto oficial del portal, subiendo a
-> 28/36 (77.8%). El número y la recomendación **vigentes son los de arriba**; se documentan los
-> intermedios por trazabilidad, no como estado actual.
+> T3/T4, subiendo a 28/36 (77.8%). Al preparar Bronze se encontró que 76 capturas de Wayback ya
+> recolectadas desde Fase 0 nunca se habían clasificado (su nombre de archivo no coincidía con
+> ningún patrón conocido) -- una de ellas resultó ser 2016 T3 real (esquema viejo, `ANIO=2016`
+> confirmado en el 99% de sus filas), subiendo a **29/36 (80.6%)**. Es decir: la declaración de
+> "4 vías agotadas, huecos confirmados" de la ronda anterior no era del todo cierta -- ya
+> teníamos evidencia sin cruzar en nuestros propios datos. El número y la recomendación
+> **vigentes son los de arriba**; se documentan los intermedios por trazabilidad, no como estado
+> actual.
 
 Hallazgos clave:
 
@@ -66,12 +71,19 @@ Hallazgos clave:
   CSV real y vivo 2022-2025 (`REPORTE_TOMO_VIII.csv`), pero es presupuesto ex-ante -- sin avance
   físico, monto ejercido ni geolocalización -- nunca pudo sustituir a OPA en granularidad. Son
   complementarios, no sucesores.
-- **Los 8 trimestres que siguen como hueco son reales, agotados por 4 vías independientes**
-  (manifiesto oficial, Wayback CDX dirigido por año, Common Crawl, y variaciones de nomenclatura
-  probadas en vivo): 2016 completo, 2017 T4, y 2018 T1/T2/T4. Ninguna de las 4 fuentes tiene
-  ningún registro para 2016-2018 bajo ninguna nomenclatura conocida -- el siguiente paso realista
-  es una solicitud de acceso a la información (PNT/INAI) a la SHCP, no más descubrimiento
-  automatizado. Quedan documentados como huecos en `reports/cobertura.md`.
+- **2016 T3 se resolvió aparte, al preparar Bronze** -- no por una nueva búsqueda, sino por
+  reclasificar en frío 76 capturas de Wayback que Fase 0 ya tenía recolectadas pero nunca
+  clasificó (nombre de archivo sin patrón reconocido: `Proyectos_OPA_3t.csv`, esquema viejo
+  `CVE_PPI`). Sigue viva hoy en el servidor. Se probó la misma convención (`Proyectos_OPA_{n}t.csv`)
+  para 1t/2t/4t de 2016 y las 4 combinaciones de 2017-2018 -- todas 404, no es un patrón amplio,
+  es un archivo suelto. `clasificar_captura()` se actualizó para que una futura corrida de
+  Wayback lo reconozca automáticamente.
+- **Los 7 trimestres que siguen como hueco son reales**, agotados por 4 vías independientes
+  (manifiesto oficial, Wayback CDX dirigido por año, Common Crawl, variaciones de nomenclatura
+  probadas en vivo) más la reclasificación en frío de arriba: 2016 T1/T2/T4, 2017 T4, y 2018
+  T1/T2/T4. El siguiente paso realista es una solicitud de acceso a la información (PNT/INAI) a
+  la SHCP, no más descubrimiento automatizado. Quedan documentados como huecos en
+  `reports/cobertura.md`.
 - **El esquema cambia de forma importante entre 2015 y 2019/2021** (45 vs. 47 columnas, `CVE_PPI`
   vs. `CVE_CARTERA`, nombres de columna casi todos distintos). 2019 y 2021 comparten esquema.
 - **`cve_cartera` no es el código numérico de 10-11 dígitos que asumía la arquitectura**: en 2019 y

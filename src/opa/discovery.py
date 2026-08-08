@@ -571,6 +571,12 @@ _PATRONES_CLASIFICACION: list[tuple[re.Pattern[str], str]] = [
         "trimestral_numerico",
     ),
     (
+        # Variante de nombre de 2016, sin año en el segmento de trimestre (Proyectos_OPA_3t.csv,
+        # no proyectos_opa_03t2016.csv). Encontrada al preparar Bronze -- ver conf/sources.yml.
+        re.compile(r"/OPA/(?P<anio>\d{4})/Proyectos_OPA_(?P<n>[1-4])t\.(csv|xlsx)", re.IGNORECASE),
+        "trimestral_numerico",
+    ),
+    (
         re.compile(
             r"/OPA/(?P<anio>\d{4})/reporteOPA(?P<ord>1er|2do|3er|4to)Trimestre(_V\d)?\.xlsx",
             re.IGNORECASE,

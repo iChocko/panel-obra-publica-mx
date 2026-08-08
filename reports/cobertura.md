@@ -1,6 +1,6 @@
 # Matriz de cobertura — Obra Pública Abierta (OPA)
 
-*Generado por `opa discover` el 2026-08-08T17:33:52.851916+00:00.*
+*Generado por `opa discover` el 2026-08-08T17:49:18.375274+00:00.*
 
 ## Leyenda
 
@@ -14,7 +14,7 @@
 | Año | Q1 | Q2 | Q3 | Q4 |
 |---|---|---|---|---|
 | 2015 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2016 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
+| 2016 | ⚪ hueco | ⚪ hueco | 🟢 vivo | ⚪ hueco |
 | 2017 | 🟢 vivo | 🟢 vivo | 🟢 vivo | ⚪ hueco |
 | 2018 | ⚪ hueco | ⚪ hueco | 🟢 vivo | ⚪ hueco |
 | 2019 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
@@ -49,7 +49,7 @@
 
 ## Puerta de decisión (2016–2024, 36 trimestres)
 
-- Trimestres recuperables: **28 / 36 (77.8%)**
+- Trimestres recuperables: **29 / 36 (80.6%)**
 - Recomendación: **Panel trimestral completo, alcance original.**
 
 ## Wayback — detalle de la pregunta clave
@@ -60,7 +60,7 @@
 - Total de capturas de **archivos de datos** (no HTML): **90**
 - Rango de fechas: 20160417180503 – 20240921105347
 - Mimetypes encontrados: application/javascript, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, image/png, text/csv
-- De esas, **2** declaran trimestre explícito en el nombre (las únicas que cuentan para la puerta de decisión).
+- De esas, **15** declaran trimestre explícito en el nombre (las únicas que cuentan para la puerta de decisión).
 
 ## Fuente 2 — Espejos: resultado
 

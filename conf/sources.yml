@@ -79,6 +79,14 @@ fuente_viva:
     - url: "/work/models/PTP/DatosAbiertos/OPA/2020/OPA3er4toTrimestre2020.csv"
       anio: 2020
       trimestre: 4
+    # Encontrado al preparar Bronze (2026-08-08): una captura de Wayback sin clasificar
+    # (mimetype text/csv, filtrada como "no_reconocido" porque el nombre no coincidía con
+    # ningún patrón conocido) resultó ser 2016 Q3 real -- esquema viejo (CVE_PPI), ANIO=2016
+    # en 99% de las 3616 filas. Se probaron 1t/2t/4t del mismo año y de 2017/2018 con esta
+    # misma convención -- todas 404, no es un patrón amplio, es un archivo suelto.
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2016/Proyectos_OPA_3t.csv"
+      anio: 2016
+      trimestre: 3
   # Se descargan completos si responden 200 (excepción explícita a "solo metadatos").
   auxiliares:
     - "/work/models/PTP/DatosAbiertos/Diccionarios/diccionario_opa.xlsx"
