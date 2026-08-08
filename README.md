@@ -331,8 +331,23 @@ de vigencia SCD2 -- no la versión más reciente) más `trimestre_corte`, `fase`
 contra el duckdb real: 30 archivos, checksums en verde, y una segunda corrida produce bytes
 **idénticos** a la primera -- el determinismo se comprobó, no se asumió.
 
-Pendientes del plan: **Fase C** (catálogo DCAT) y **Fase D** (evaluación de datos personales +
-nota técnica de limitaciones empaquetada con los datos).
+**Fase C -- Catálogo DCAT, completa.** `opa publish` ahora también escribe
+`data/publish/{version}/catalog.json`, un catálogo DCAT (JSON-LD, vocabulario W3C estándar
+`dcat:`/`dct:`/`foaf:`/`spdx:` -- ver `conf/dcat.yml` para lo declarativo) con un
+`dcat:Dataset` por tabla y un `dcat:Distribution` por archivo real (tamaño y sha256
+calculados sobre el archivo, no inventados). Los 13 GeoJSON se adjuntan al dataset
+`fct_ppi_observacion`, de donde se derivan, en vez de aparecer como datasets sueltos.
+También incluye `x-procedencia` y `x-calidad` -- resúmenes reales de `data/manifest.jsonl` y
+`reports/calidad_silver.md` bajo un prefijo `x-` explícito, porque no son vocabulario DCAT
+oficial (el Manual Operativo de la ATDT sigue sin publicarse). Construida con 4 agentes
+coordinados en 2 etapas (dos módulos independientes en paralelo + revisión adversarial cada
+uno, luego el generador que depende de ambos + su propia revisión) e integrada a mano en el
+CLI, con `checksums.sha256` corriendo al final para cubrir también `catalog.json`. Verificado
+contra el paquete real: 8 datasets, 15 distribuciones en `fct_ppi_observacion`, checksums en
+verde, y el paquete completo produce bytes idénticos en una segunda corrida.
+
+Pendiente del plan: **Fase D** (evaluación de datos personales + nota técnica de limitaciones
+empaquetada con los datos).
 
 ## Cómo correr Fase 0 + Bronze + Silver + Gold
 
@@ -377,7 +392,8 @@ dbt build --project-dir dbt --profiles-dir dbt
 # reports/diccionario/ (versionado en git).
 uv run opa diccionario
 
-# Publicación de distribuciones (Fase B). CSV + Parquet + GeoJSON + checksums.sha256 en
+# Publicación de distribuciones (Fase B) + catálogo DCAT (Fase C). CSV + Parquet + GeoJSON +
+# catalog.json (DCAT) + checksums.sha256 (cubre también catalog.json) en
 # data/publish/{version}/ (fuera de git) -- version por defecto = corte más reciente del
 # duckdb (ej. 2026T1), o pasa --version explícito.
 uv run opa publish

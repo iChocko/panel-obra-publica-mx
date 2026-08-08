@@ -557,6 +557,7 @@ def diccionario() -> None:
 # --------------------------------------------------------------------------
 
 DIR_PUBLISH = Path("data/publish")
+RUTA_DCAT_YML = Path("conf/dcat.yml")
 
 
 def _version_por_defecto(ruta_duckdb: Path) -> str:
@@ -592,7 +593,9 @@ def publish(
     Determinista: mismo duckdb produce siempre los mismos bytes. Falla ruidoso (código 1)
     si falta alguna de las 8 tablas publicables.
     """
-    from opa import publish_geojson, publish_manifest, publish_tabular
+    from opa import publish_dcat, publish_geojson, publish_manifest, publish_tabular
+    from opa.dcat_config import ErrorDcatConfig
+    from opa.dcat_procedencia import ErrorProcedencia
 
     if not RUTA_GOLD_DUCKDB.exists():
         console.print(
@@ -613,6 +616,21 @@ def publish(
     geojson = publish_geojson.escribir_geojson(RUTA_GOLD_DUCKDB, DIR_PUBLISH, version_resuelta)
 
     dir_paquete = DIR_PUBLISH / version_resuelta
+
+    try:
+        ruta_catalog = publish_dcat.escribir_catalogo(
+            dir_paquete=dir_paquete,
+            ruta_dcat_yml=RUTA_DCAT_YML,
+            ruta_schema_yml=RUTA_SCHEMA_MARTS,
+            ruta_manifest=RUTA_MANIFEST_JSONL,
+            ruta_calidad_silver=RUTA_CALIDAD_SILVER_MD,
+        )
+    except (publish_dcat.ErrorCatalogo, ErrorDcatConfig, ErrorProcedencia) as exc:
+        console.print(f"[bold red]No se pudo generar el catálogo DCAT.[/] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    # checksums.sha256 va AL FINAL, después de catalog.json, para que también lo cubra --
+    # es el último archivo del paquete en escribirse.
     try:
         ruta_checksums = publish_manifest.escribir_checksums(dir_paquete)
     except publish_manifest.ErrorManifiesto as exc:
@@ -621,7 +639,7 @@ def publish(
 
     console.print(
         f"\n[bold green]Publicación completa.[/] {len(tabulares)} archivos tabulares, "
-        f"{len(geojson)} GeoJSON, checksums en {ruta_checksums}"
+        f"{len(geojson)} GeoJSON, catálogo DCAT en {ruta_catalog}, checksums en {ruta_checksums}"
     )
 
 

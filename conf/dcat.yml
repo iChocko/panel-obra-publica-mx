@@ -1,0 +1,65 @@
+# dcat.yml -- lo declarativo de metadatos DCAT que NO se puede derivar de otros archivos
+# del repo (Fase C del plan de alineación ATDT, ver docs/PLAN-alineacion-gold-lineamientos-ATDT.md).
+#
+# Lo que SÍ se deriva de otras fuentes (data/manifest.jsonl, reports/calidad_silver.md,
+# checksums.sha256, tamaños reales de archivo) vive en el generador
+# (src/opa/dcat_config.py + el módulo de catalog.json que lo consume), no aquí. Este archivo
+# es solo lo que ningún otro archivo del repo ya sabe.
+#
+# Art. 3-XIV de los Lineamientos (docs/normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md)
+# define DCAT como "estándar internacional diseñado para facilitar la interoperabilidad entre
+# los catálogos de datos" -- el generador usa el vocabulario DCAT estándar (W3C, namespaces
+# dcat:/dct:/foaf:), no un "perfil mexicano" inventado. Cualquier campo de este archivo que no
+# mapee 1:1 a una propiedad DCAT estándar se emite bajo una clave "x-*" en el catalog.json
+# generado, nunca mezclado como si fuera DCAT oficial.
+
+catalogo:
+  titulo: "Panel Histórico de Obra Pública Federal (México)"
+
+  descripcion: >
+    Panel longitudinal de Programas y Proyectos de Inversión (PPI) federales de México,
+    reconstruido a partir de Obra Pública Abierta (OPA) de la Secretaría de Hacienda y Crédito
+    Público (SHCP). La SHCP publica cada trimestre una fotografía del universo de proyectos que
+    sobreescribe a la anterior -- el visor oficial y los archivos de nombre genérico solo
+    muestran el corte más reciente -- por lo que este catálogo reconstruye la serie histórica a
+    partir de tres capas (archivos vivos con nombre de trimestre, espejos en portales de datos
+    abiertos, y capturas del Internet Archive) que en conjunto no existen públicamente en ningún
+    otro lugar. El grano es la observación por clave de cartera (cve_cartera) por corte
+    trimestral.
+
+  temas:
+    - "finanzas públicas"
+    - "obra pública"
+    - "presupuesto"
+    - "inversión pública"
+
+  licencia:
+    # Texto EXACTO de README.md, sección "## Licencia" -- no parafrasear.
+    nombre: "Términos de Libre Uso MX"
+    url: "https://datos.gob.mx/libreusomx"
+    fundamento: >
+      Los datos de OPA son un conjunto separado del código de este repositorio (el código está
+      bajo licencia MIT), sujeto a los Términos de Libre Uso MX (datos.gob.mx/libreusomx) bajo
+      el "Decreto por el que se establece la regulación en materia de Datos Abiertos" (DOF
+      20/02/2015). Toda redistribución debe citar: nombre del conjunto de datos, siglas de la
+      dependencia (SHCP), liga de los datos descargados y fecha de consulta en formato
+      AAAA-MM-DD.
+
+  cadencia:
+    valor: "trimestral"
+    fundamento: >
+      Este repositorio no genera datos nuevos: republica y reconstruye la serie histórica de
+      OPA/SHCP, cuyo propio calendario de publicación es trimestral. La cadencia declarada aquí
+      sigue ese calendario fuente, no un ritmo propio de actualización de este proyecto.
+
+  contacto:
+    nombre: "Repositorio panel-obra-publica-mx (proyecto ciudadano de portafolio, no institucional)"
+    referencia: "https://github.com/iChocko/panel-obra-publica-mx"
+
+  fuente_primaria:
+    nombre: "Secretaría de Hacienda y Crédito Público (SHCP) -- Obra Pública Abierta (OPA)"
+    # Dominio confirmado en conf/sources.yml (fuente_viva.base_url), única URL de fuente
+    # verificada con GET real en este repo -- no existe en el repo una URL de portada más
+    # específica que la SHCP mantenga estable entre rediseños (ver notas en conf/sources.yml
+    # sobre la migración de rutas de 2022-2026).
+    url: "https://www.transparenciapresupuestaria.gob.mx"

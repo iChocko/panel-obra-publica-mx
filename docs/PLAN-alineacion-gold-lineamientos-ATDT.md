@@ -3,7 +3,7 @@
 **Fecha:** 2026-08-08
 **Referencia normativa:** [Acuerdo DOF 11/09/2025](normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md)
 (transcripción completa en este repo; PDF original en `docs/normativa/`).
-**Estado:** Fases A y B completas (2026-08-08). Fases C, D pendientes.
+**Estado:** Fases A, B y C completas (2026-08-08). Fase D pendiente.
 
 ---
 
@@ -106,17 +106,49 @@ contra el duckdb real antes de commitear.
 5. ✅ `data/publish/` queda fuera de git (confirmado con `git status`, ya cubierto por el
    `.gitignore` existente de `data/*`) -- mismo criterio que bronze/silver/gold.
 
-### Fase C -- Metadatos DCAT
+### Fase C -- Metadatos DCAT -- COMPLETA (2026-08-08)
 
-1. `conf/dcat.yml`: lo declarativo que no se puede derivar (título, descripción, temas, licencia
-   de datos -- Libre Uso MX --, cadencia declarada con su fundamentación, contacto).
-2. Generador que combina `conf/dcat.yml` + `data/manifest.jsonl` (procedencia real) +
-   `reports/calidad_silver.md` (calidad real) → `catalog.json` (DCAT, JSON-LD) dentro del paquete
-   de `opa publish`. Un `dcat:Dataset` por tabla; un `dcat:Distribution` por formato (CSV, Parquet,
-   GeoJSON), cada una con su media type, tamaño y checksum.
-3. No inventar campos del "perfil mexicano": mientras no exista el Manual Operativo, usar DCAT
-   estándar (W3C) + los campos que los propios Lineamientos nombran (Art. 3-XXII). Cuando la ATDT
-   publique el Manual, el delta se aplica en `conf/dcat.yml` y el generador, no en los datos.
+Construida con 4 agentes en 2 etapas coordinadas: `dcat_config` y `dcat_procedencia` en
+paralelo (independientes entre sí) + revisión adversarial de cada uno, luego `publish_dcat`
+(depende de ambos, corrió después de que los dos quedaron revisados) + su propia revisión.
+Integración del comando CLI hecha a mano, no delegada.
+
+1. ✅ `conf/dcat.yml`: lo declarativo que no se puede derivar -- título, descripción (basada
+   en la tesis real del README), temas, licencia (texto EXACTO de la sección "## Licencia"
+   del README -- Términos de Libre Uso MX, DOF 20/02/2015, requisitos de cita), cadencia
+   ("trimestral", fundamentada en que este repo sigue el calendario de publicación de la
+   SHCP, no genera datos nuevos), contacto, y fuente primaria (URL confirmada contra
+   `conf/sources.yml`, no inventada). `src/opa/dcat_config.py` lo carga y valida --
+   **falla ruidoso listando TODAS las claves faltantes/vacías de una sola vez**, mismo
+   patrón que `diccionario.py`.
+2. ✅ `src/opa/dcat_procedencia.py`: `resumen_procedencia()` agrega `data/manifest.jsonl`
+   real (n_snapshots, conteo por origen vivo/wayback, fecha de descarga más reciente, bytes
+   totales, rango de años) y `resumen_calidad()` extrae la sección `## Resumen` de
+   `reports/calidad_silver.md` con regex dirigida (no un parser Markdown genérico). Ambas
+   fallan ruidoso ante un insumo faltante, vacío, o con una línea de JSON corrupto (indicando
+   el número de línea exacto).
+3. ✅ `src/opa/publish_dcat.py`: combina `dcat_config` + `dcat_procedencia` +
+   `diccionario.cargar_descripciones_de_tablas` (reutilizada, no reimplementada) + un escaneo
+   real de `dir_paquete/tabular/` y `dir_paquete/geojson/` (tamaño y sha256 de cada archivo,
+   calculado en chunks) para escribir `catalog.json` (DCAT JSON-LD, vocabulario W3C estándar
+   `dcat:`/`dct:`/`foaf:`/`spdx:`) dentro del propio paquete de `opa publish`. **Un
+   `dcat:Dataset` por tabla, un `dcat:Distribution` por archivo real** -- los 13 GeoJSON se
+   adjuntan todos al dataset `fct_ppi_observacion` (de ahí se derivan), no como datasets
+   sueltos. Corrida real: 8 datasets, `fct_ppi_observacion` con 15 distribuciones (2
+   tabulares + 13 GeoJSON), `x-procedencia`/`x-calidad` con números reales
+   (142 snapshots, 89 vivo + 53 wayback, 98.9% de filas válidas). `checksums.sha256` se
+   corre AL FINAL del pipeline de `opa publish` para que también cubra `catalog.json` --
+   verificado con `shasum -a 256 -c` en verde sobre el paquete completo.
+4. ✅ No se inventó "perfil mexicano": todo el vocabulario del catálogo es DCAT/DCT/SPDX
+   estándar; los resúmenes propios del repo (`x-procedencia`, `x-calidad`) van bajo claves
+   con prefijo `x-` explícitas y una nota (`x-nota`) que aclara que no son vocabulario DCAT
+   oficial -- el Manual Operativo de la ATDT sigue sin publicarse (verificado de nuevo).
+5. Nota de alcance sobre el criterio de aceptación global §6.3 ("catalog.json valida contra
+   el vocabulario DCAT, validación sintáctica JSON-LD en CI"): lo que se verificó fue
+   estructura JSON válida + presencia y forma de las claves `@context`/`@type`/DCAT
+   esperadas, a mano, contra el paquete real -- **no** hay un validador JSON-LD real corriendo
+   en CI todavía (añadir uno implicaría una dependencia nueva, fuera del alcance que se le
+   pidió a los agentes de esta fase). Queda como pendiente explícito, no como completo.
 
 ### Fase D -- Contexto, privacidad y empaquetado final
 
