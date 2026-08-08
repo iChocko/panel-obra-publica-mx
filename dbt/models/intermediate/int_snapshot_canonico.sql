@@ -35,14 +35,29 @@ from (
         anio,
         trimestre,
         producto,
+        -- OJO (hallazgo real, 2026-08-08): sin desempate secundario, dos snapshots del
+        -- mismo (anio, trimestre) con el MISMO producto (ej. 2016 T3: dos archivos
+        -- producto='otro', mismo contenido -- '2016Q3_ccbf1d23' origen=vivo y
+        -- '2016Q3_b33e65ed' origen=wayback) empataban en el CASE de abajo, y row_number()
+        -- sin un ORDER BY totalmente determinista no garantiza qué fila gana entre
+        -- corridas -- confirmado: la misma consulta repetida daba snapshot_id distinto.
+        -- Esto se propaga a int_ppi_observaciones_canonicas -> dim_ppi (SCD2) / fct_ppi_delta
+        -- / fct_ppi_ciclo_vida, con snapshot_id_inicio/fin potencialmente distintos entre
+        -- builds sin que nada lo marque como error. Desempate: origen='vivo' sobre
+        -- 'wayback' (mismo criterio que el resto del proyecto: preferir la fuente viva
+        -- cuando el contenido es equivalente), y snapshot_id alfabético como último
+        -- desempate por si ni producto ni origen bastan.
         row_number() over (
             partition by anio, trimestre
-            order by case producto
-                when 'consolidado' then 1
-                when 'seguimiento' then 2
-                when 'concluido' then 3
-                else 4
-            end
+            order by
+                case producto
+                    when 'consolidado' then 1
+                    when 'seguimiento' then 2
+                    when 'concluido' then 3
+                    else 4
+                end,
+                case origen when 'vivo' then 1 else 2 end,
+                snapshot_id
         ) as rn
     from {{ ref('stg_snapshots') }}
     where trimestre is not null
