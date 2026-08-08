@@ -43,6 +43,13 @@ El resultado: **29 de 36 trimestres del periodo 2016–2024 son recuperables (80
 2015 y de todo 2025–2026. Los 7 trimestres restantes se agotaron por cuatro vías independientes y
 quedan documentados como huecos reales, no interpolados.
 
+![Cobertura del panel por corte trimestral](reports/figuras/cobertura_cortes.png)
+
+Azul es dato real; rojo es un corte que la fuente declara pero llega corrupto; gris es un hueco
+real sin ninguna fuente conocida. El asterisco marca cobertura parcial (no es el universo
+Consolidado completo). Galería completa con interpretación de cada figura:
+[`reports/figuras/GALERIA.md`](reports/figuras/GALERIA.md).
+
 ## Qué hay en el panel
 
 Números reales del build actual (`data/gold/panel_opa.duckdb`):
@@ -59,6 +66,8 @@ Con eso se puede responder, por primera vez de forma directa: sobrecosto por pro
 inicial vs. final), duración observada vs. planeada, trayectoria de avance físico, cambios de
 estatus, proyectos que desaparecen del padrón sin explicación, y la distribución geográfica de la
 inversión federal a lo largo de once años.
+
+![Distribución geográfica de los proyectos de inversión](reports/figuras/mapa_ppi.png)
 
 ## Arquitectura: cuatro capas
 
@@ -202,6 +211,17 @@ reorganización administrativa real (IMSS-BIENESTAR obtuvo ramo presupuestal pro
 uno era probable depuración de estudios de preinversión estancados. El test se ajustó para
 excluir la transición Q4→Q1 y sigue activo para el resto.
 
+![Universo de PPI por corte trimestral, con el patrón estacional Q4→Q1 marcado](reports/figuras/universo_por_corte.png)
+
+**No todo proyecto que desaparece del padrón terminó.** De los 11,025 proyectos del panel, 6,785
+quedan clasificados como "salida no explicada": nunca llegaron a 95% de avance y dejaron de
+aparecer antes del corte más reciente. Eso puede ser una cancelación real, o un proyecto que cayó
+justo en uno de los 7 trimestres-hueco del panel — los datos abiertos, tal como los publica la
+SHCP, no permiten distinguir ambos casos. Es una limitación declarada, no una cifra que se
+presente como certeza.
+
+![Estatus terminal inferido de los 11,025 proyectos del panel](reports/figuras/estatus_terminal.png)
+
 **Nota de entorno:** tanto `transparenciapresupuestaria.gob.mx` como `datos.gob.mx` sirven una
 cadena de certificados TLS incompleta (rotaron su intermedio de Let's Encrypt pero el servidor no
 lo envía). `httpx`/OpenSSL no hacen *AIA chasing* y fallan con `CERTIFICATE_VERIFY_FAILED`;
@@ -284,6 +304,10 @@ uv run opa diccionario
 # 6. Paquete publicable: CSV + Parquet + GeoJSON + DCAT + nota + checksums.
 #    → data/publish/{version}/   (versión por defecto = corte más reciente del panel)
 uv run opa publish
+
+# 7. Figuras estáticas del panel (requiere Chrome para Kaleido -- si falta, correr una
+#    vez `uv run plotly_get_chrome`). → reports/figuras/*.png + GALERIA.md
+uv run opa figuras
 ```
 
 Los pasos 1–3 son opcionales si solo se quiere el panel: el
@@ -296,10 +320,11 @@ ya trae el resultado final.
 conf/           Configuración declarativa: patrones de URL, mapeo de esquemas,
                 metadatos DCAT, serie de deflactor
 src/opa/        Paquete Python: discovery, bronze, normalize, diccionario,
-                y los cuatro módulos de publicación (tabular/geojson/dcat/nota)
+                los cuatro módulos de publicación (tabular/geojson/dcat/nota)
+                y figuras (visualizaciones estáticas)
 dbt/            Capa Gold: staging → intermediate → marts, seeds y tests
-tests/          138 tests (pytest)
-reports/        Salidas versionadas: cobertura, esquemas, calidad, diccionario
+tests/          155 tests (pytest)
+reports/        Salidas versionadas: cobertura, esquemas, calidad, diccionario, figuras
 docs/           Normativa ATDT (PDF + transcripción) y plan de alineación
 data/           Bronze, Silver, Gold y paquetes publicados (fuera de git,
                 salvo manifest.jsonl)

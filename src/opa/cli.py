@@ -654,5 +654,37 @@ def publish(
     )
 
 
+# --------------------------------------------------------------------------
+# Figuras -- visualizaciones estáticas del panel (PNG, reports/figuras/)
+# --------------------------------------------------------------------------
+
+DIR_FIGURAS = Path("reports/figuras")
+
+
+@app.command()
+def figuras() -> None:
+    """Genera reports/figuras/*.png + GALERIA.md desde el duckdb de Gold.
+
+    Falla ruidoso (código 1) si falta el duckdb, una tabla requerida, o Kaleido no puede
+    exportar PNG (típicamente falta Chrome -- corre `uv run plotly_get_chrome`).
+    """
+    from opa import figuras as figuras_mod
+
+    if not RUTA_GOLD_DUCKDB.exists():
+        console.print(
+            f"[bold red]No existe {RUTA_GOLD_DUCKDB}.[/] Corre primero: "
+            "dbt build --project-dir dbt --profiles-dir dbt"
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        escritas = figuras_mod.exportar(RUTA_GOLD_DUCKDB, DIR_FIGURAS)
+    except figuras_mod.ErrorFiguras as exc:
+        console.print(f"[bold red]Figuras incompletas.[/]\n{exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"[bold green]Figuras generadas.[/] {len(escritas)} archivos en {DIR_FIGURAS}/")
+
+
 if __name__ == "__main__":
     app()
