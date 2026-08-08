@@ -1,6 +1,6 @@
 # Matriz de cobertura — Obra Pública Abierta (OPA)
 
-*Generado por `opa discover` el 2026-08-08T04:13:22.462669+00:00.*
+*Generado por `opa discover` el 2026-08-08T04:46:47.163588+00:00.*
 
 ## Leyenda
 
@@ -17,8 +17,8 @@
 | 2016 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
 | 2017 | 🟢 vivo | 🟢 vivo | 🟢 vivo | ⚪ hueco |
 | 2018 | ⚪ hueco | ⚪ hueco | 🟢 vivo | ⚪ hueco |
-| 2019 | ⚪ hueco | ⚪ hueco | ⚪ hueco | ⚪ hueco |
-| 2020 | 🟢 vivo | 🟢 vivo | ⚪ hueco | ⚪ hueco |
+| 2019 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
+| 2020 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
 | 2021 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
 | 2022 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
 | 2023 | 🟢 vivo | 🟢 vivo | 🟢 vivo | 🟢 vivo |
@@ -49,8 +49,8 @@
 
 ## Puerta de decisión (2016–2024, 36 trimestres)
 
-- Trimestres recuperables: **22 / 36 (61.1%)**
-- Recomendación: **Panel trimestral parcial, huecos documentados en el reporte de calidad.**
+- Trimestres recuperables: **28 / 36 (77.8%)**
+- Recomendación: **Panel trimestral completo, alcance original.**
 
 ## Wayback — detalle de la pregunta clave
 

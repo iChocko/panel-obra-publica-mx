@@ -56,6 +56,33 @@ def test_generar_urls_vivas_asigna_trimestre_correcto() -> None:
     assert all(t[2] == 2 for t in trimestrales)
 
 
+def test_generar_urls_vivas_casos_especiales_ausentes_no_rompe() -> None:
+    """CFG_MINIMA no declara casos_especiales -- .get() con default debe manejarlo sin error."""
+    urls = list(generar_urls_vivas(CFG_MINIMA))
+    assert not any(u[3] == "caso_especial" for u in urls)
+
+
+def test_generar_urls_vivas_casos_especiales_usa_anio_trimestre_declarados() -> None:
+    cfg = {
+        **CFG_MINIMA,
+        "fuente_viva": {
+            **CFG_MINIMA["fuente_viva"],
+            "casos_especiales": [
+                {"url": "/OPA/2019/opa_trimestral.csv", "anio": 2019, "trimestre": 1},
+                {"url": "/OPA/2020/OPA3er4toTrimestre2020.csv", "anio": 2020, "trimestre": 3},
+                {"url": "/OPA/2020/OPA3er4toTrimestre2020.csv", "anio": 2020, "trimestre": 4},
+            ],
+        },
+    }
+    urls = list(generar_urls_vivas(cfg))
+    casos = [u for u in urls if u[3] == "caso_especial"]
+    assert len(casos) == 3
+    assert (casos[0][1], casos[0][2]) == (2019, 1)
+    # la misma URL puede repetirse con distinto trimestre (archivo combinado T3+T4)
+    assert casos[1][0] == casos[2][0]
+    assert {casos[1][2], casos[2][2]} == {3, 4}
+
+
 def test_generar_urls_vivas_auxiliar_sin_anio_ni_trimestre() -> None:
     urls = list(generar_urls_vivas(CFG_MINIMA))
     auxiliares = [u for u in urls if u[3] == "auxiliar"]

@@ -48,6 +48,32 @@ fuente_viva:
   trimestre_n: [1, 2, 3, 4]
   trimestre_ord: ["1er", "2do", "3er", "4to"]
   version_v: [2, 3]
+  # Casos especiales (Fase 1b, 2026-08-08): URLs exactas de un solo año/trimestre con
+  # nomenclatura irregular que no sigue ningún patrón parametrizable de arriba -- no se
+  # generan por producto cartesiano {anio}x{ord}, se prueban tal cual. Encontradas siguiendo
+  # el manifiesto oficial del portal (row-down-opa.json, ver auxiliares), que etiqueta cada
+  # URL con su trimestre en texto plano. El archivo de 2020 cubre T3 y T4 juntos en un solo
+  # CSV -- se repite la misma URL con trimestre 3 y 4 para que ambas celdas de la matriz
+  # queden cubiertas (2 requests a la misma URL, redundante pero simple y correcto).
+  casos_especiales:
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2019/opa_trimestral.csv"
+      anio: 2019
+      trimestre: 1
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2019/OPASegundoTrimestre2019.csv"
+      anio: 2019
+      trimestre: 2
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2019/OPATercerTrimestre2019.csv"  # el manifiesto trae un typo ("OPATerceTrimestre2019.csv", sin la "r") que da 404 -- esta es la forma real
+      anio: 2019
+      trimestre: 3
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2019/OPA4toTrimestre2019.csv"
+      anio: 2019
+      trimestre: 4
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2020/OPA3er4toTrimestre2020.csv"
+      anio: 2020
+      trimestre: 3
+    - url: "/work/models/PTP/DatosAbiertos/OPA/2020/OPA3er4toTrimestre2020.csv"
+      anio: 2020
+      trimestre: 4
   # Se descargan completos si responden 200 (excepción explícita a "solo metadatos").
   auxiliares:
     - "/work/models/PTP/DatosAbiertos/Diccionarios/diccionario_opa.xlsx"
@@ -57,6 +83,10 @@ fuente_viva:
     # descarga vigentes. Útil como referencia cruzada, no como fuente única -- solo apunta
     # al trimestre más reciente de cada archivo, no al histórico completo.
     - "/work/models/PTP/NPTP/api/page-config/opa/row-down-opa.json"
+    # Complementarios (Fase 1b): no llenan un hueco trimestral, pero son datos reales del
+    # mismo dataset OPA que vale la pena preservar.
+    - "/work/models/PTP/DatosAbiertos/OPA/2020/ConcluidoOPA3er4toTrimestre2020.csv"
+    - "/work/models/PTP/DatosAbiertos/OPA/2019/opa_concluidos.csv"  # concluidos acumulado desde 2015
 
 # --- Fuente 2: espejos ----------------------------------------------------
 fuente_espejo:

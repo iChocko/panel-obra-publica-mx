@@ -278,6 +278,12 @@ def generar_urls_vivas(
                 etiqueta = "anual_generico" if "DatosAbiertos" in patron else "anual_generico_antiguo"
                 yield base + patron.format(anio=anio), anio, None, etiqueta
 
+    # Casos especiales (Fase 1b): URLs exactas de un solo año/trimestre, nomenclatura
+    # irregular que no sigue ningún patrón parametrizable -- no forman parte del producto
+    # cartesiano de arriba, se prueban tal cual con el (anio, trimestre) declarado en config.
+    for caso in fv.get("casos_especiales", []):
+        yield base + caso["url"], caso["anio"], caso["trimestre"], "caso_especial"
+
     for aux in fv["auxiliares"]:
         yield base + aux, None, None, "auxiliar"
 
