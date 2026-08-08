@@ -3,7 +3,7 @@
 **Fecha:** 2026-08-08
 **Referencia normativa:** [Acuerdo DOF 11/09/2025](normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md)
 (transcripción completa en este repo; PDF original en `docs/normativa/`).
-**Estado:** plan aprobado pendiente de ejecución -- ninguna fase se ha implementado.
+**Estado:** Fase A completa (2026-08-08). Fases B, C, D pendientes.
 
 ---
 
@@ -44,18 +44,26 @@ para poder realinearse al Manual cuando exista sin rehacer nada a mano.
 
 ## 3. Fases de ejecución
 
-### Fase A -- Diccionario de datos (prerequisito de todo lo demás)
+### Fase A -- Diccionario de datos (prerequisito de todo lo demás) -- COMPLETA (2026-08-08)
 
-1. Enriquecer `dbt/models/marts/schema.yml`: descripción por **cada columna** de las 8 tablas
-   publicables (`fct_ppi_observacion`, `fct_ppi_delta`, `fct_ppi_ciclo_vida`, `dim_ppi`,
-   `dim_snapshot`, `dim_ramo`, `dim_entidad`, `dim_tipo_ppi`). Hoy solo hay 10 descripciones;
-   faltan ~70 columnas. Las descripciones deben decir unidad, origen (columna fuente SHCP) y
-   advertencias reales (ej. `anio` nullable ~20%, montos nominales vs `_real`).
-2. Script generador (`src/opa/diccionario.py` o macro dbt): `schema.yml` → un
-   `diccionario_datos_{tabla}.csv` por tabla (formato tabular, como pide el Art. 38 incluso para
-   el diccionario mismo) + un `DICCIONARIO.md` legible por humanos.
-3. Criterio de aceptación: 0 columnas sin descripción (test de CI que falla si aparece una
-   columna nueva sin documentar).
+1. ✅ `dbt/models/marts/schema.yml` enriquecido: descripción por **cada columna** de las 8
+   tablas publicables (`fct_ppi_observacion`, `fct_ppi_delta`, `fct_ppi_ciclo_vida`, `dim_ppi`,
+   `dim_snapshot`, `dim_ramo`, `dim_entidad`, `dim_tipo_ppi`) -- de 10 a ~80 descripciones.
+   Cada una dice unidad (pesos corrientes MXN salvo indicación contraria; avance 0-100),
+   columna fuente SHCP cuando el nombre cambió, y advertencias reales verificadas contra el
+   duckdb (no supuestas): `ejercido > modificado` en 18.5% de filas, `fase` solo poblada en
+   2017-2018, montos verificados en magnitud contra Tren Maya (~1.67e11), etc.
+2. ✅ `src/opa/diccionario.py` + comando `opa diccionario`: cruza `schema.yml` contra las
+   columnas REALES de `data/gold/panel_opa.duckdb` (no solo contra lo declarado) y escribe
+   `reports/diccionario/diccionario_datos_{tabla}.csv` (uno por tabla, formato tabular como
+   pide el Art. 38 incluso para el diccionario mismo) + `DICCIONARIO.md` consolidado.
+3. ✅ Criterio de aceptación cumplido de dos formas: (a) `opa diccionario` **falla ruidoso**
+   (código 1, no advertencia) si una columna real no tiene descripción o si `schema.yml`
+   documenta una columna que ya no existe -- deriva entre documentación y datos tratada igual
+   que cualquier otro error del pipeline; (b) `tests/test_diccionario.py` incluye una guardia
+   de CI (`test_schema_real_del_repo_no_tiene_columnas_sin_descripcion`) que corre sin
+   necesitar el duckdb (no existe en CI), para atrapar el caso común de agregar una columna a
+   `schema.yml` sin documentarla antes de que alguien intente generar el diccionario.
 
 ### Fase B -- Exportador de distribuciones (`opa publish`)
 

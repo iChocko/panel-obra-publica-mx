@@ -1,0 +1,12 @@
+tabla,posicion,columna,tipo_dato,descripcion
+dim_snapshot,1,snapshot_id,VARCHAR,"Identificador único del corte: ""{año}Q{trimestre}_{sha8}"" (ej. 2021Q3_ae02c33e) o ""{año}_anual_{sha8}"" para archivos anuales sin trimestre declarado. El sufijo es el sha256 truncado del archivo fuente -- el mismo contenido produce siempre el mismo id (direccionable por contenido, ver data/manifest.jsonl)."
+dim_snapshot,2,anio,INTEGER,Año del corte declarado por la fuente (2015-2026).
+dim_snapshot,3,trimestre,INTEGER,Trimestre del corte (1-4). NULL para snapshots anuales genéricos (proyectos_opa.csv sin trimestre en el nombre) cuyo vintage exacto la fuente no declara -- esos cortes se excluyen de los modelos cronológicos (ver int_snapshot_canonico.sql).
+dim_snapshot,4,origen,VARCHAR,"Vía por la que se recuperó el archivo: ""vivo"" (servidor actual de la SHCP) o ""wayback"" (captura del Wayback Machine para cortes que ya no existen en vivo)."
+dim_snapshot,5,fecha_descarga,DATE,Fecha en que este repo descargó el archivo (no la fecha de publicación original).
+dim_snapshot,6,url,VARCHAR,"URL exacta de la que se descargó el archivo fuente (procedencia, citable)."
+dim_snapshot,7,sha256,VARCHAR,Hash SHA-256 completo del archivo fuente tal como se descargó (integridad verificable).
+dim_snapshot,8,bytes,BIGINT,Tamaño del archivo fuente en bytes.
+dim_snapshot,9,n_observaciones,BIGINT,Filas del snapshot que pasaron el contrato de Silver. 0 si el snapshot quedó excluido (ver estado).
+dim_snapshot,10,n_ppi,BIGINT,PPI distintos (cve_cartera únicos) en el snapshot normalizado. Menor o igual a n_observaciones porque un PPI puede traer varias sub-filas (ver n_registros_agregados en fct_ppi_observacion).
+dim_snapshot,11,estado,VARCHAR,"""normalizado"" (llegó a Silver) o ""excluido_de_silver"" (el manifiesto lo conoce pero no se pudo normalizar -- ej. los 3 archivos de 2024 T1, corruptos en la fuente misma). Los excluidos se listan con conteos en cero para que la exclusión sea visible, no silenciosa."

@@ -290,6 +290,36 @@ Otros hallazgos reales de esta fase:
   y funcionan, simplemente salen `NULL` hasta que alguien con acceso a un token de Banxico SIE
   llene el CSV con la serie oficial. No se aproximó con un supuesto de inflación genérico.
 
+## Alineación a los Lineamientos de Datos Abiertos de la ATDT (`docs/`, 2026-08-08)
+
+El 11/09/2025 la Agencia de Transformación Digital y Telecomunicaciones (ATDT) publicó en el
+DOF los ["Lineamientos en materia de Datos Abiertos de la Administración Pública
+Federal"](docs/normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md) (PDF original
+también en `docs/normativa/`) -- el estándar técnico vigente para datos abiertos federales en
+México (DCAT, diccionario de datos, metadatos de procedencia y calidad). **Este repo no es una
+Institución Publicante** (los Lineamientos obligan a la APF, no a un proyecto ciudadano), pero
+el plan documentado en
+[`docs/PLAN-alineacion-gold-lineamientos-ATDT.md`](docs/PLAN-alineacion-gold-lineamientos-ATDT.md)
+adopta voluntariamente la parte técnica -- porque es el estándar de calidad correcto y porque
+deja el dataset listo para integrarse a la Plataforma Nacional de Datos Abiertos si algún actor
+institucional lo retoma. Verificado en vivo contra la API de `datos.gob.mx` (2026-08-08): el
+panel OPA/PPI **no está duplicado** en la plataforma nacional -- 0 resultados para "Obra
+Pública Abierta" o "programas y proyectos de inversión", y no existe ninguna organización de
+Hacienda/SHCP entre las 25 registradas en el catálogo (reconstruido por la ATDT entre
+septiembre y diciembre de 2025).
+
+**Fase A -- Diccionario de datos, completa.** `dbt/models/marts/schema.yml` es ahora la fuente
+única de las ~80 columnas publicables de las 8 tablas de Gold (antes 10 documentadas, el resto
+sin descripción). `opa diccionario` cruza ese schema contra las columnas REALES del duckdb y
+**falla ruidoso** (no advierte, se detiene) si aparece una columna sin descripción o una
+descripción de una columna que ya no existe -- la deriva entre documentación y datos es un
+error, igual que el resto de este pipeline. Escribe `reports/diccionario/` (fuera de git,
+regenerable): un `diccionario_datos_{tabla}.csv` por tabla y un `DICCIONARIO.md` consolidado.
+
+Pendientes del plan: **Fase B** (`opa publish` -- CSV base + Parquet/GeoJSON como extra sobre
+lo que piden los Lineamientos), **Fase C** (catálogo DCAT) y **Fase D** (evaluación de datos
+personales + nota técnica de limitaciones empaquetada con los datos).
+
 ## Cómo correr Fase 0 + Bronze + Silver + Gold
 
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
@@ -327,6 +357,11 @@ uv run opa normalize
 # data/gold/panel_opa.duckdb (fuera de git). --project-dir y --profiles-dir son
 # necesarios porque dbt/ no es la raíz del repo.
 dbt build --project-dir dbt --profiles-dir dbt
+
+# Diccionario de datos (Fase A de la alineación a Lineamientos ATDT, ver arriba). Falla
+# ruidoso si hay columnas reales sin documentar en dbt/models/marts/schema.yml. Escribe
+# reports/diccionario/ (fuera de git).
+uv run opa diccionario
 ```
 
 Reportes producidos:

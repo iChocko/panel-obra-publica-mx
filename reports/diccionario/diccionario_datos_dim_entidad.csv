@@ -1,0 +1,4 @@
+tabla,posicion,columna,tipo_dato,descripcion
+dim_entidad,1,id_entidad_federativa,INTEGER,"Clave INEGI de la entidad (1 = Aguascalientes ... 32 = Ciudad de México) más los códigos especiales de la fuente: 33 = en el extranjero, 34 = no distribuible geográficamente, 35 = cobertura nacional."
+dim_entidad,2,entidad_federativa,VARCHAR,Nombre de la entidad federativa o descripción del código especial.
+dim_entidad,3,en_catalogo_oficial,BOOLEAN,true para las 32 entidades del catálogo INEGI/SHCP; false para los 3 códigos especiales que solo existen en los datos del panel.

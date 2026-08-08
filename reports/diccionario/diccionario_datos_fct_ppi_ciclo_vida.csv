@@ -1,0 +1,19 @@
+tabla,posicion,columna,tipo_dato,descripcion
+fct_ppi_ciclo_vida,1,cve_cartera,VARCHAR,Clave de cartera del PPI (ver fct_ppi_observacion.cve_cartera). Única aquí -- un renglón por PPI.
+fct_ppi_ciclo_vida,2,nombre_ppi,VARCHAR,Nombre del PPI en su PRIMERA observación (los renombramientos posteriores no lo actualizan aquí).
+fct_ppi_ciclo_vida,3,primer_corte,INTEGER,"Primer corte en que se observó el PPI, formato año*10+trimestre."
+fct_ppi_ciclo_vida,4,ultimo_corte,INTEGER,"Último corte en que se observó el PPI, mismo formato."
+fct_ppi_ciclo_vida,5,trimestres_entre_primera_y_ultima_observacion,INTEGER,Trimestres calendario entre la primera y la última observación (índice lineal). 0 = observado en un solo corte.
+fct_ppi_ciclo_vida,6,snapshot_id_inicio,VARCHAR,snapshot_id de la primera observación.
+fct_ppi_ciclo_vida,7,snapshot_id_fin,VARCHAR,snapshot_id de la última observación.
+fct_ppi_ciclo_vida,8,n_observaciones,BIGINT,Cortes canónicos en que se observó el PPI. Puede ser menor que la brecha de trimestres + 1 si el PPI cayó en huecos del panel.
+fct_ppi_ciclo_vida,9,n_anios_observado,BIGINT,Años calendario distintos con al menos una observación del PPI.
+fct_ppi_ciclo_vida,10,alguna_observacion_con_cobertura_parcial,BOOLEAN,true si al menos una observación proviene de un corte de cobertura parcial (2020 T1/T2) -- tratar sus fechas extremas y conteos con cautela.
+fct_ppi_ciclo_vida,11,monto_inicial,DOUBLE,"Presupuesto modificado en la primera observación, pesos corrientes MXN."
+fct_ppi_ciclo_vida,12,monto_final,DOUBLE,"Presupuesto modificado en la última observación, pesos corrientes MXN."
+fct_ppi_ciclo_vida,13,sobrecosto_pct,DOUBLE,"(monto_final - monto_inicial) / monto_inicial * 100. NULL si monto_inicial <= 0. OJO doble: son pesos NOMINALES (parte del ""sobrecosto"" de proyectos largos es inflación) y compara modificado del ciclo, no monto total del proyecto -- interpretarlo como señal de arrastre, no como sobrecosto contable auditado."
+fct_ppi_ciclo_vida,14,duracion_planeada_anios,DOUBLE,Años de horizonte de ejecución declarados por la fuente en la primera observación (columna fuente ANIOS_HE). NULL donde el esquema fuente no la publica.
+fct_ppi_ciclo_vida,15,duracion_observada_anios,DOUBLE,"trimestres_entre_primera_y_ultima_observacion / 4 -- años entre la primera y la última vez que ESTE PANEL vio el PPI, no la duración real de la obra (censura por los bordes y huecos del panel)."
+fct_ppi_ciclo_vida,16,avance_fisico_final,DOUBLE,"Avance físico en la última observación, puntos porcentuales 0-100."
+fct_ppi_ciclo_vida,17,estatus_operacion_final,VARCHAR,Estatus de operación en la última observación.
+fct_ppi_ciclo_vida,18,estatus_terminal_inferido,VARCHAR,"Regla declarada de la arquitectura sección 2.2: ""terminado_probable"" (avance final >= 95), ""vigente_ultimo_corte_disponible"" (su última observación ES el último corte del panel -- no ha terminado de observarse), o ""salida_no_explicada"" (desapareció antes del final del panel sin avance >= 95: puede ser salida real O un hueco de cobertura nuestro -- indistinguibles con los datos abiertos disponibles)."

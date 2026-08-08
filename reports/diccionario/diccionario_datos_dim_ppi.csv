@@ -1,0 +1,19 @@
+tabla,posicion,columna,tipo_dato,descripcion
+dim_ppi,1,cve_cartera,VARCHAR,Clave de cartera del PPI (ver fct_ppi_observacion.cve_cartera).
+dim_ppi,2,version_ppi,HUGEINT,Número de versión SCD2 del PPI (1 = primera combinación de atributos observada; sube cada vez que algún atributo descriptivo cambia entre cortes consecutivos).
+dim_ppi,3,vigente_desde_corte,INTEGER,"Primer corte con esta versión de atributos, formato legible año*10+trimestre (ej. 20213 = 2021 T3). Solo para ordenar/mostrar, no para aritmética de brechas."
+dim_ppi,4,vigente_hasta_corte,INTEGER,Último corte observado con esta versión de atributos (mismo formato).
+dim_ppi,5,snapshot_id_inicio,VARCHAR,snapshot_id del primer corte de esta versión. FK informal a dim_snapshot.
+dim_ppi,6,snapshot_id_fin,VARCHAR,snapshot_id del último corte de esta versión.
+dim_ppi,7,nombre_ppi,VARCHAR,"Nombre del PPI vigente en esta versión, textual de la fuente. Los renombramientos entre versiones son reales y frecuentes (ver fct_ppi_delta.bandera_renombramiento)."
+dim_ppi,8,id_ramo,BIGINT,Ramo de esta versión. FK a dim_ramo.
+dim_ppi,9,descripcion_ramo,VARCHAR,Nombre del ramo tal como lo publicó la fuente en esta versión.
+dim_ppi,10,descripcion_tipo_ppi,VARCHAR,"Tipo de PPI, texto libre de la fuente (mismas 29 variantes y advertencia que en fct_ppi_observacion)."
+dim_ppi,11,id_ur,DOUBLE,Clave de la Unidad Responsable (dependencia/entidad ejecutora) dentro del ramo. Numérica en la fuente moderna; NULL donde el esquema fuente no la publica.
+dim_ppi,12,descripcion_ur,VARCHAR,"Nombre de la Unidad Responsable, textual de la fuente."
+dim_ppi,13,localizacion,VARCHAR,"Descripción textual libre de la ubicación (municipio, localidad, tramo carretero, etc.) tal como la capturó la dependencia -- sin normalizar, calidad heterogénea."
+dim_ppi,14,id_entidad_federativa,DOUBLE,Entidad federativa de esta versión (clave INEGI o código 33-35). FK a dim_entidad.
+dim_ppi,15,entidad_federativa,VARCHAR,"Nombre de la entidad, textual de la fuente."
+dim_ppi,16,latitud,DOUBLE,Latitud en grados decimales de esta versión (mismo tratamiento que en fct_ppi_observacion).
+dim_ppi,17,longitud,DOUBLE,Longitud en grados decimales de esta versión.
+dim_ppi,18,es_version_vigente,BOOLEAN,"true solo para la versión más reciente de cada PPI -- filtro directo para obtener ""el estado actual conocido"" sin ventana propia."

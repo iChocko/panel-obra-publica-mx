@@ -1,0 +1,26 @@
+tabla,posicion,columna,tipo_dato,descripcion
+fct_ppi_delta,1,cve_cartera,VARCHAR,Clave de cartera del PPI (ver fct_ppi_observacion.cve_cartera).
+fct_ppi_delta,2,snapshot_id,VARCHAR,"Corte ""actual"" del delta. FK a dim_snapshot."
+fct_ppi_delta,3,snapshot_id_anterior,VARCHAR,Corte anterior REALMENTE OBSERVADO de este PPI -- no necesariamente el trimestre calendario previo (el panel tiene huecos; ver brecha_trimestres).
+fct_ppi_delta,4,anio,INTEGER,Año del corte actual.
+fct_ppi_delta,5,trimestre,INTEGER,Trimestre del corte actual (1-4).
+fct_ppi_delta,6,orden_corte,INTEGER,Corte actual en formato legible año*10+trimestre (solo ordenar/mostrar).
+fct_ppi_delta,7,brecha_trimestres,INTEGER,"Trimestres calendario entre la observación anterior y esta (índice lineal año*4+trimestre, cruza años sin romperse). 1 = delta trimestral limpio; >1 = el delta cruza un hueco de cobertura -- no interpretarlo igual (un salto de monto en brecha 3 no es un cambio trimestral)."
+fct_ppi_delta,8,cobertura_parcial_del_universo,BOOLEAN,"true si el corte actual proviene de un producto que NO es el universo completo (ej. 2020 T1/T2 solo tienen ""Concluido"") -- los deltas contra/desde esos cortes comparan universos distintos por diseño de la fuente."
+fct_ppi_delta,9,modificado_anterior,DOUBLE,"Presupuesto modificado en el corte anterior, pesos corrientes MXN."
+fct_ppi_delta,10,modificado,DOUBLE,"Presupuesto modificado en el corte actual, pesos corrientes MXN."
+fct_ppi_delta,11,delta_modificado,DOUBLE,"modificado - modificado_anterior, pesos corrientes MXN (nominal: parte del cambio entre años es inflación, no decisión presupuestaria)."
+fct_ppi_delta,12,ejercido_anterior,DOUBLE,"Monto ejercido en el corte anterior, pesos corrientes MXN."
+fct_ppi_delta,13,ejercido,DOUBLE,"Monto ejercido en el corte actual, pesos corrientes MXN."
+fct_ppi_delta,14,delta_ejercido,DOUBLE,"ejercido - ejercido_anterior, pesos corrientes MXN. Negativo entre ciclos fiscales es normal (el ejercido del año nuevo arranca en cero), no un reintegro."
+fct_ppi_delta,15,monto_total_inversion_anterior,DOUBLE,"Monto total de inversión en el corte anterior, pesos corrientes MXN."
+fct_ppi_delta,16,monto_total_inversion,DOUBLE,"Monto total de inversión en el corte actual, pesos corrientes MXN."
+fct_ppi_delta,17,delta_monto_total_inversion,DOUBLE,"Cambio del monto total de inversión, pesos corrientes MXN -- la señal cruda de re-dimensionamiento/sobrecosto entre cortes."
+fct_ppi_delta,18,avance_fisico_anterior,DOUBLE,"Avance físico en el corte anterior, puntos porcentuales 0-100."
+fct_ppi_delta,19,avance_fisico,DOUBLE,"Avance físico en el corte actual, puntos porcentuales 0-100."
+fct_ppi_delta,20,delta_avance_fisico,DOUBLE,Cambio de avance físico en puntos porcentuales.
+fct_ppi_delta,21,avance_fisico_decrecio,BOOLEAN,true si el avance físico BAJÓ entre cortes -- físicamente anómalo (una obra no se des-construye) pero real en la fuente: re-baselineos y correcciones de captura. Es la bandera que exige la arquitectura sección 6.2.
+fct_ppi_delta,22,estatus_operacion_anterior,VARCHAR,Estatus de operación en el corte anterior (mismas variantes sin normalizar).
+fct_ppi_delta,23,estatus_operacion,VARCHAR,Estatus de operación en el corte actual.
+fct_ppi_delta,24,cambio_estatus,BOOLEAN,"true si el estatus cambió entre cortes (NULL-seguro, is distinct from)."
+fct_ppi_delta,25,bandera_renombramiento,BOOLEAN,true si el nombre del PPI cambió entre cortes manteniendo la misma cve_cartera -- señal para no tratar el nombre como identificador y para auditar continuidad.

@@ -1,5 +1,13 @@
 version: 2
 
+# Este archivo es la FUENTE ÚNICA del diccionario de datos (plan de alineación a los
+# Lineamientos ATDT, Fase A -- docs/PLAN-alineacion-gold-lineamientos-ATDT.md). Toda columna
+# publicada debe tener description; un test de CI falla si aparece una sin documentar.
+# Convenciones de las descripciones: unidad explícita cuando aplica (montos en pesos
+# corrientes MXN -- verificado contra megaproyectos conocidos, ej. Tren Maya ~167 mil
+# millones; avance en puntos porcentuales 0-100), columna fuente SHCP entre paréntesis
+# cuando el nombre cambió, y advertencias reales medidas en el corpus (no supuestos).
+
 models:
   - name: dim_snapshot
     description: >
@@ -7,9 +15,49 @@ models:
       llegó a Silver o quedó excluido (corrupto en la fuente / esquema desconocido).
     columns:
       - name: snapshot_id
+        description: >
+          Identificador único del corte: "{año}Q{trimestre}_{sha8}" (ej. 2021Q3_ae02c33e) o
+          "{año}_anual_{sha8}" para archivos anuales sin trimestre declarado. El sufijo es
+          el sha256 truncado del archivo fuente -- el mismo contenido produce siempre el
+          mismo id (direccionable por contenido, ver data/manifest.jsonl).
         tests:
           - unique
           - not_null
+      - name: anio
+        description: Año del corte declarado por la fuente (2015-2026).
+      - name: trimestre
+        description: >
+          Trimestre del corte (1-4). NULL para snapshots anuales genéricos
+          (proyectos_opa.csv sin trimestre en el nombre) cuyo vintage exacto la fuente no
+          declara -- esos cortes se excluyen de los modelos cronológicos (ver
+          int_snapshot_canonico.sql).
+      - name: origen
+        description: >
+          Vía por la que se recuperó el archivo: "vivo" (servidor actual de la SHCP) o
+          "wayback" (captura del Wayback Machine para cortes que ya no existen en vivo).
+      - name: fecha_descarga
+        description: Fecha en que este repo descargó el archivo (no la fecha de publicación original).
+      - name: url
+        description: URL exacta de la que se descargó el archivo fuente (procedencia, citable).
+      - name: sha256
+        description: Hash SHA-256 completo del archivo fuente tal como se descargó (integridad verificable).
+      - name: bytes
+        description: Tamaño del archivo fuente en bytes.
+      - name: n_observaciones
+        description: >
+          Filas del snapshot que pasaron el contrato de Silver. 0 si el snapshot quedó
+          excluido (ver estado).
+      - name: n_ppi
+        description: >
+          PPI distintos (cve_cartera únicos) en el snapshot normalizado. Menor o igual a
+          n_observaciones porque un PPI puede traer varias sub-filas (ver
+          n_registros_agregados en fct_ppi_observacion).
+      - name: estado
+        description: >
+          "normalizado" (llegó a Silver) o "excluido_de_silver" (el manifiesto lo conoce
+          pero no se pudo normalizar -- ej. los 3 archivos de 2024 T1, corruptos en la
+          fuente misma). Los excluidos se listan con conteos en cero para que la exclusión
+          sea visible, no silenciosa.
 
   - name: dim_ramo
     description: >
@@ -18,9 +66,22 @@ models:
       actual -- ver la nota completa en dim_ramo.sql.
     columns:
       - name: id_ramo
+        description: >
+          Clave numérica del ramo presupuestario federal (ej. 9 = Infraestructura,
+          Comunicaciones y Transportes; 12 = Salud). Incluye ramos históricos ya
+          reorganizados (ej. 17 = PGR) y ramos nuevos que la fuente estrena antes de que el
+          catálogo oficial los recoja (ej. 56 = IMSS-BIENESTAR, aparece en 2026 T1).
         tests:
           - unique
           - not_null
+      - name: descripcion_ramo
+        description: >
+          Nombre del ramo. Para ramos fuera del catálogo vigente, la descripción se tomó
+          textual de la columna DESC_RAMO del propio panel, no se inventó.
+      - name: en_catalogo_oficial
+        description: >
+          true si el ramo está en el catálogo oficial vigente de la SHCP (catalogos.xlsx);
+          false para históricos y códigos que solo existen en los datos.
 
   - name: dim_entidad
     description: >
@@ -29,17 +90,33 @@ models:
       aparecen en programas de cobertura nacional -- ver dim_entidad.sql.
     columns:
       - name: id_entidad_federativa
+        description: >
+          Clave INEGI de la entidad (1 = Aguascalientes ... 32 = Ciudad de México) más los
+          códigos especiales de la fuente: 33 = en el extranjero, 34 = no distribuible
+          geográficamente, 35 = cobertura nacional.
         tests:
           - unique
           - not_null
+      - name: entidad_federativa
+        description: Nombre de la entidad federativa o descripción del código especial.
+      - name: en_catalogo_oficial
+        description: >
+          true para las 32 entidades del catálogo INEGI/SHCP; false para los 3 códigos
+          especiales que solo existen en los datos del panel.
 
   - name: dim_tipo_ppi
     description: Catálogo oficial (catalogos.xlsx) de 11 tipos de programa/proyecto de inversión.
     columns:
       - name: id_tipo_ppi
+        description: Clave numérica del tipo de PPI en el catálogo oficial de la SHCP.
         tests:
           - unique
           - not_null
+      - name: descripcion_tipo_ppi
+        description: >
+          Descripción oficial del tipo. OJO: fct_ppi_observacion.descripcion_tipo_ppi
+          trae el texto libre de la fuente (29 variantes), no estas 11 -- no hay un id en
+          los datos crudos que las una limpiamente (ver dim_tipo_ppi.sql).
 
   - name: fct_ppi_observacion
     description: >
@@ -48,39 +125,84 @@ models:
       stg_opa_snapshot -- (cve_cartera, snapshot_id) no es único en los datos crudos.
     columns:
       - name: cve_cartera
+        description: >
+          Clave de cartera del PPI asignada por la Unidad de Inversiones de la SHCP.
+          Alfanumérica de 10-11 caracteres (ej. 2151GYN0003) tras limpiar la comilla
+          inicial de Excel -- NO es numérica, 99.2% de cumplimiento medido sobre 32,186
+          valores reales. Es el identificador que permite seguir un PPI a través de cortes.
         tests:
           - not_null
       - name: snapshot_id
+        description: Corte en que se observó este renglón. FK a dim_snapshot.
         tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('dim_snapshot')
                 field: snapshot_id
-      - name: id_ramo
-        tests:
-          - relationships:
-              arguments:
-                to: ref('dim_ramo')
-                field: id_ramo
-              config:
-                where: "id_ramo is not null"
-      - name: id_entidad_federativa
-        tests:
-          - relationships:
-              arguments:
-                to: ref('dim_entidad')
-                field: id_entidad_federativa
-              config:
-                where: "id_entidad_federativa is not null"
+      - name: anio_corte
+        description: >
+          Año del corte (copiado de dim_snapshot para consulta directa). NULL en
+          observaciones de snapshots anuales genéricos y en ~20% de filas del propio
+          esquema fuente moderno (medido, no supuesto).
+      - name: trimestre_corte
+        description: Trimestre del corte (1-4); NULL en snapshots anuales genéricos.
+      - name: n_registros_agregados
+        description: >
+          Cuántas sub-filas del archivo fuente se colapsaron en esta observación. 1 =
+          renglón directo; >1 = programa multi-entidad publicado como una fila por
+          sub-asignación (hasta 33), cuyos montos aquí están SUMADOS y cuyos atributos
+          descriptivos vienen de la sub-fila de mayor monto -- la pérdida de precisión
+          geográfica queda declarada en esta columna, no escondida (ver
+          int_ppi_observaciones_dedup.sql).
+      - name: aprobado
+        description: >
+          Presupuesto aprobado del ciclo fiscal del corte, pesos corrientes MXN (columna
+          fuente APROBADO/MONTO_APROBADO según el año del esquema).
+      - name: modificado
+        description: >
+          Presupuesto modificado del ciclo fiscal del corte, pesos corrientes MXN. Es el
+          monto contra el que la fuente reporta el ejercicio del año en curso.
+      - name: ejercido
+        description: >
+          Monto ejercido, pesos corrientes MXN. OJO (hallazgo real, Fase 2): en 18.5% de
+          filas ejercido > modificado por márgenes de cientos de veces -- consistente con
+          un EJERCIDO acumulado del proyecto contra un MODIFICADO del ciclo vigente. No
+          asumir que son comparables directamente; pregunta abierta documentada.
+      - name: monto_total_inversion
+        description: >
+          Monto total de inversión del PPI completo (todos los años), pesos corrientes MXN.
+          Verificado en magnitud contra megaproyectos conocidos (Tren Maya ~1.67e11).
+      - name: monto_operacion_mantenimiento
+        description: >
+          Monto de operación y mantenimiento asociado al PPI, pesos corrientes MXN. Solo
+          existe en algunos esquemas fuente; NULL donde la fuente no lo publica.
+      - name: costo_total_inversion
+        description: >
+          Costo total (inversión + operación y mantenimiento) declarado por la fuente,
+          pesos corrientes MXN. Solo en esquemas que lo publican; no se calcula aquí.
+      - name: ppef
+        description: >
+          Monto en el Proyecto de Presupuesto de Egresos de la Federación del ciclo, pesos
+          corrientes MXN (columna fuente MONTO_PPEF, esquemas 2017-2018).
+      - name: pef
+        description: >
+          Monto en el Presupuesto de Egresos de la Federación aprobado del ciclo, pesos
+          corrientes MXN. Solo en esquemas que lo publican.
+      - name: avance_fisico
+        description: >
+          Avance físico reportado, puntos porcentuales 0-100 (verificado: promedio 43.5,
+          rango completo). En observaciones agregadas (n_registros_agregados > 1) es el
+          máximo de las sub-filas, nunca su suma.
       - name: estatus_operacion
         description: >
-          OJO (hallazgo real, 2026-08-08): incluye variantes de texto de la misma fuente que
-          no se normalizaron en Silver (ej. "Calendario Fiscal Concluido / Operación" con
-          espacios vs. "Calendario Fiscal Concluido/Operación" sin espacios; "En Proceso de
-          Cancelación" vs. "En proceso de cancelación" con minúscula) -- pendiente de
-          unificar en una futura pasada de Silver. El test aquí fija el conjunto conocido
-          HOY para detectar valores genuinamente nuevos, no para validar que estén limpios.
+          Estatus del PPI en el sistema de la Unidad de Inversiones (esquema moderno,
+          2018+; NULL antes -- ver fase). OJO (hallazgo real, 2026-08-08): incluye
+          variantes de texto de la misma fuente que no se normalizaron en Silver (ej.
+          "Calendario Fiscal Concluido / Operación" con espacios vs. sin espacios; "En
+          Proceso de Cancelación" vs. minúscula) -- pendiente de unificar en una futura
+          pasada de Silver. El test aquí fija el conjunto conocido HOY para detectar
+          valores genuinamente nuevos, no para validar que estén limpios.
         tests:
           - accepted_values:
               arguments:
@@ -98,6 +220,23 @@ models:
                   - "En Proceso de Registro APP"
               config:
                 where: "estatus_operacion is not null"
+      - name: fase
+        description: >
+          Fase del PPI en el esquema viejo/transicional de la fuente (columna FASE, solo
+          2017-2018 -- verificado: 0 valores fuera de esos cortes). Cumple el rol que
+          estatus_operacion tiene en el esquema moderno pero con vocabulario propio; se
+          conserva como columna aparte a propósito, sin mapearla (ver conf/schema_map.yml).
+      - name: id_ramo
+        description: Ramo presupuestario del PPI en este corte. FK a dim_ramo.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_ramo')
+                field: id_ramo
+              config:
+                where: "id_ramo is not null"
+      - name: descripcion_ramo
+        description: Nombre del ramo tal como lo publicó la fuente en este corte.
       - name: descripcion_tipo_ppi
         description: >
           OJO: texto libre de 11 años de fuente, no el catálogo oficial de 11 valores de
@@ -139,6 +278,42 @@ models:
                   - "Según los lineamientos para el análisis costo y beneficio que entraron en vigor el 01.01.2006"
               config:
                 where: "descripcion_tipo_ppi is not null"
+      - name: id_entidad_federativa
+        description: >
+          Entidad federativa del PPI en este corte (clave INEGI o código especial 33-35).
+          FK a dim_entidad. En agregados multi-entidad es la de la sub-fila de mayor monto.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_entidad')
+                field: id_entidad_federativa
+              config:
+                where: "id_entidad_federativa is not null"
+      - name: entidad_federativa
+        description: Nombre de la entidad tal como lo publicó la fuente en este corte.
+      - name: latitud
+        description: >
+          Latitud del PPI en grados decimales (WGS84 implícito en la fuente). El centinela
+          0 del esquema viejo ya se trató como NULL en Silver -- (0,0) es imposible en
+          México y era el 48.6% de 2015 (hallazgo real de Fase 2). Puede quedar algún punto
+          fuera del territorio: la fuente publica errores de captura reales.
+      - name: longitud
+        description: >
+          Longitud del PPI en grados decimales (negativa en México). Mismo tratamiento de
+          centinelas que latitud.
+      - name: modificado_real
+        description: >
+          modificado deflactado a pesos constantes del año base (ver anio_base_deflactor).
+          NULL hasta que conf/deflactor_inpc.csv se llene con la serie oficial de Banxico
+          SIE -- se prefirió NULL explícito a aproximar con inflación genérica.
+      - name: ejercido_real
+        description: ejercido deflactado a pesos constantes. NULL por la misma razón que modificado_real.
+      - name: monto_total_inversion_real
+        description: monto_total_inversion deflactado a pesos constantes. NULL por la misma razón.
+      - name: anio_base_deflactor
+        description: >
+          Año base de la serie INPC usada para deflactar (columna anio_base de
+          conf/deflactor_inpc.csv). NULL mientras el CSV siga vacío.
 
   - name: dim_ppi
     description: >
@@ -147,8 +322,57 @@ models:
       viven en fct_ppi_observacion, no aquí.
     columns:
       - name: cve_cartera
+        description: Clave de cartera del PPI (ver fct_ppi_observacion.cve_cartera).
         tests:
           - not_null
+      - name: version_ppi
+        description: >
+          Número de versión SCD2 del PPI (1 = primera combinación de atributos observada;
+          sube cada vez que algún atributo descriptivo cambia entre cortes consecutivos).
+      - name: vigente_desde_corte
+        description: >
+          Primer corte con esta versión de atributos, formato legible año*10+trimestre
+          (ej. 20213 = 2021 T3). Solo para ordenar/mostrar, no para aritmética de brechas.
+      - name: vigente_hasta_corte
+        description: Último corte observado con esta versión de atributos (mismo formato).
+      - name: snapshot_id_inicio
+        description: snapshot_id del primer corte de esta versión. FK informal a dim_snapshot.
+      - name: snapshot_id_fin
+        description: snapshot_id del último corte de esta versión.
+      - name: nombre_ppi
+        description: >
+          Nombre del PPI vigente en esta versión, textual de la fuente. Los renombramientos
+          entre versiones son reales y frecuentes (ver fct_ppi_delta.bandera_renombramiento).
+      - name: id_ramo
+        description: Ramo de esta versión. FK a dim_ramo.
+      - name: descripcion_ramo
+        description: Nombre del ramo tal como lo publicó la fuente en esta versión.
+      - name: descripcion_tipo_ppi
+        description: >
+          Tipo de PPI, texto libre de la fuente (mismas 29 variantes y advertencia que en
+          fct_ppi_observacion).
+      - name: id_ur
+        description: >
+          Clave de la Unidad Responsable (dependencia/entidad ejecutora) dentro del ramo.
+          Numérica en la fuente moderna; NULL donde el esquema fuente no la publica.
+      - name: descripcion_ur
+        description: Nombre de la Unidad Responsable, textual de la fuente.
+      - name: localizacion
+        description: >
+          Descripción textual libre de la ubicación (municipio, localidad, tramo carretero,
+          etc.) tal como la capturó la dependencia -- sin normalizar, calidad heterogénea.
+      - name: id_entidad_federativa
+        description: Entidad federativa de esta versión (clave INEGI o código 33-35). FK a dim_entidad.
+      - name: entidad_federativa
+        description: Nombre de la entidad, textual de la fuente.
+      - name: latitud
+        description: Latitud en grados decimales de esta versión (mismo tratamiento que en fct_ppi_observacion).
+      - name: longitud
+        description: Longitud en grados decimales de esta versión.
+      - name: es_version_vigente
+        description: >
+          true solo para la versión más reciente de cada PPI -- filtro directo para obtener
+          "el estado actual conocido" sin ventana propia.
 
   - name: fct_ppi_delta
     description: >
@@ -156,8 +380,77 @@ models:
       distingue un delta de un trimestre limpio de uno que cruza un hueco de cobertura real.
     columns:
       - name: cve_cartera
+        description: Clave de cartera del PPI (ver fct_ppi_observacion.cve_cartera).
         tests:
           - not_null
+      - name: snapshot_id
+        description: Corte "actual" del delta. FK a dim_snapshot.
+      - name: snapshot_id_anterior
+        description: >
+          Corte anterior REALMENTE OBSERVADO de este PPI -- no necesariamente el trimestre
+          calendario previo (el panel tiene huecos; ver brecha_trimestres).
+      - name: anio
+        description: Año del corte actual.
+      - name: trimestre
+        description: Trimestre del corte actual (1-4).
+      - name: orden_corte
+        description: Corte actual en formato legible año*10+trimestre (solo ordenar/mostrar).
+      - name: brecha_trimestres
+        description: >
+          Trimestres calendario entre la observación anterior y esta (índice lineal
+          año*4+trimestre, cruza años sin romperse). 1 = delta trimestral limpio; >1 = el
+          delta cruza un hueco de cobertura -- no interpretarlo igual (un salto de monto en
+          brecha 3 no es un cambio trimestral).
+      - name: cobertura_parcial_del_universo
+        description: >
+          true si el corte actual proviene de un producto que NO es el universo completo
+          (ej. 2020 T1/T2 solo tienen "Concluido") -- los deltas contra/desde esos cortes
+          comparan universos distintos por diseño de la fuente.
+      - name: modificado_anterior
+        description: Presupuesto modificado en el corte anterior, pesos corrientes MXN.
+      - name: modificado
+        description: Presupuesto modificado en el corte actual, pesos corrientes MXN.
+      - name: delta_modificado
+        description: >
+          modificado - modificado_anterior, pesos corrientes MXN (nominal: parte del cambio
+          entre años es inflación, no decisión presupuestaria).
+      - name: ejercido_anterior
+        description: Monto ejercido en el corte anterior, pesos corrientes MXN.
+      - name: ejercido
+        description: Monto ejercido en el corte actual, pesos corrientes MXN.
+      - name: delta_ejercido
+        description: >
+          ejercido - ejercido_anterior, pesos corrientes MXN. Negativo entre ciclos
+          fiscales es normal (el ejercido del año nuevo arranca en cero), no un reintegro.
+      - name: monto_total_inversion_anterior
+        description: Monto total de inversión en el corte anterior, pesos corrientes MXN.
+      - name: monto_total_inversion
+        description: Monto total de inversión en el corte actual, pesos corrientes MXN.
+      - name: delta_monto_total_inversion
+        description: >
+          Cambio del monto total de inversión, pesos corrientes MXN -- la señal cruda de
+          re-dimensionamiento/sobrecosto entre cortes.
+      - name: avance_fisico_anterior
+        description: Avance físico en el corte anterior, puntos porcentuales 0-100.
+      - name: avance_fisico
+        description: Avance físico en el corte actual, puntos porcentuales 0-100.
+      - name: delta_avance_fisico
+        description: Cambio de avance físico en puntos porcentuales.
+      - name: avance_fisico_decrecio
+        description: >
+          true si el avance físico BAJÓ entre cortes -- físicamente anómalo (una obra no
+          se des-construye) pero real en la fuente: re-baselineos y correcciones de
+          captura. Es la bandera que exige la arquitectura sección 6.2.
+      - name: estatus_operacion_anterior
+        description: Estatus de operación en el corte anterior (mismas variantes sin normalizar).
+      - name: estatus_operacion
+        description: Estatus de operación en el corte actual.
+      - name: cambio_estatus
+        description: true si el estatus cambió entre cortes (NULL-seguro, is distinct from).
+      - name: bandera_renombramiento
+        description: >
+          true si el nombre del PPI cambió entre cortes manteniendo la misma cve_cartera --
+          señal para no tratar el nombre como identificador y para auditar continuidad.
 
   - name: fct_ppi_ciclo_vida
     description: >
@@ -167,10 +460,65 @@ models:
       salida real del universo de reporte).
     columns:
       - name: cve_cartera
+        description: Clave de cartera del PPI (ver fct_ppi_observacion.cve_cartera). Única aquí -- un renglón por PPI.
         tests:
           - unique
           - not_null
+      - name: nombre_ppi
+        description: Nombre del PPI en su PRIMERA observación (los renombramientos posteriores no lo actualizan aquí).
+      - name: primer_corte
+        description: Primer corte en que se observó el PPI, formato año*10+trimestre.
+      - name: ultimo_corte
+        description: Último corte en que se observó el PPI, mismo formato.
+      - name: trimestres_entre_primera_y_ultima_observacion
+        description: >
+          Trimestres calendario entre la primera y la última observación (índice lineal).
+          0 = observado en un solo corte.
+      - name: snapshot_id_inicio
+        description: snapshot_id de la primera observación.
+      - name: snapshot_id_fin
+        description: snapshot_id de la última observación.
+      - name: n_observaciones
+        description: >
+          Cortes canónicos en que se observó el PPI. Puede ser menor que la brecha de
+          trimestres + 1 si el PPI cayó en huecos del panel.
+      - name: n_anios_observado
+        description: Años calendario distintos con al menos una observación del PPI.
+      - name: alguna_observacion_con_cobertura_parcial
+        description: >
+          true si al menos una observación proviene de un corte de cobertura parcial
+          (2020 T1/T2) -- tratar sus fechas extremas y conteos con cautela.
+      - name: monto_inicial
+        description: Presupuesto modificado en la primera observación, pesos corrientes MXN.
+      - name: monto_final
+        description: Presupuesto modificado en la última observación, pesos corrientes MXN.
+      - name: sobrecosto_pct
+        description: >
+          (monto_final - monto_inicial) / monto_inicial * 100. NULL si monto_inicial <= 0.
+          OJO doble: son pesos NOMINALES (parte del "sobrecosto" de proyectos largos es
+          inflación) y compara modificado del ciclo, no monto total del proyecto --
+          interpretarlo como señal de arrastre, no como sobrecosto contable auditado.
+      - name: duracion_planeada_anios
+        description: >
+          Años de horizonte de ejecución declarados por la fuente en la primera observación
+          (columna fuente ANIOS_HE). NULL donde el esquema fuente no la publica.
+      - name: duracion_observada_anios
+        description: >
+          trimestres_entre_primera_y_ultima_observacion / 4 -- años entre la primera y la
+          última vez que ESTE PANEL vio el PPI, no la duración real de la obra (censura por
+          los bordes y huecos del panel).
+      - name: avance_fisico_final
+        description: Avance físico en la última observación, puntos porcentuales 0-100.
+      - name: estatus_operacion_final
+        description: Estatus de operación en la última observación.
       - name: estatus_terminal_inferido
+        description: >
+          Regla declarada de la arquitectura sección 2.2: "terminado_probable" (avance
+          final >= 95), "vigente_ultimo_corte_disponible" (su última observación ES el
+          último corte del panel -- no ha terminado de observarse), o
+          "salida_no_explicada" (desapareció antes del final del panel sin avance >= 95:
+          puede ser salida real O un hueco de cobertura nuestro -- indistinguibles con los
+          datos abiertos disponibles).
         tests:
           - accepted_values:
               arguments:

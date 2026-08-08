@@ -1,0 +1,3 @@
+tabla,posicion,columna,tipo_dato,descripcion
+dim_tipo_ppi,1,id_tipo_ppi,INTEGER,Clave numérica del tipo de PPI en el catálogo oficial de la SHCP.
+dim_tipo_ppi,2,descripcion_tipo_ppi,VARCHAR,"Descripción oficial del tipo. OJO: fct_ppi_observacion.descripcion_tipo_ppi trae el texto libre de la fuente (29 variantes), no estas 11 -- no hay un id en los datos crudos que las una limpiamente (ver dim_tipo_ppi.sql)."

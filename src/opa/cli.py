@@ -514,5 +514,42 @@ def inspect() -> None:
     console.print(f"\n[bold green]Inspección completa.[/] Reporte: {RUTA_ESQUEMAS_MD}")
 
 
+# --------------------------------------------------------------------------
+# Diccionario de datos (Fase A del plan de alineación ATDT -- ver
+# docs/PLAN-alineacion-gold-lineamientos-ATDT.md)
+# --------------------------------------------------------------------------
+
+RUTA_SCHEMA_MARTS = Path("dbt/models/marts/schema.yml")
+RUTA_GOLD_DUCKDB = Path("data/gold/panel_opa.duckdb")
+DIR_DICCIONARIO = Path("reports/diccionario")
+
+
+@app.command()
+def diccionario() -> None:
+    """Genera el diccionario de datos de Gold desde schema.yml contra el duckdb real.
+
+    Falla ruidoso (código 1) si alguna columna real no tiene descripción o si schema.yml
+    documenta columnas que ya no existen -- la deriva es un error, no una advertencia.
+    """
+    from opa import diccionario as diccionario_mod
+
+    if not RUTA_GOLD_DUCKDB.exists():
+        console.print(
+            f"[bold red]No existe {RUTA_GOLD_DUCKDB}.[/] Corre primero: "
+            "dbt build --project-dir dbt --profiles-dir dbt"
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        escritas = diccionario_mod.generar(RUTA_SCHEMA_MARTS, RUTA_GOLD_DUCKDB, DIR_DICCIONARIO)
+    except diccionario_mod.ErrorDiccionario as exc:
+        console.print(f"[bold red]Diccionario incompleto.[/]\n{exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"[bold green]Diccionario generado.[/] {len(escritas)} archivos:")
+    for ruta in escritas:
+        console.print(f"  {ruta}")
+
+
 if __name__ == "__main__":
     app()

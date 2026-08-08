@@ -1,0 +1,4 @@
+tabla,posicion,columna,tipo_dato,descripcion
+dim_ramo,1,id_ramo,INTEGER,"Clave numérica del ramo presupuestario federal (ej. 9 = Infraestructura, Comunicaciones y Transportes; 12 = Salud). Incluye ramos históricos ya reorganizados (ej. 17 = PGR) y ramos nuevos que la fuente estrena antes de que el catálogo oficial los recoja (ej. 56 = IMSS-BIENESTAR, aparece en 2026 T1)."
+dim_ramo,2,descripcion_ramo,VARCHAR,"Nombre del ramo. Para ramos fuera del catálogo vigente, la descripción se tomó textual de la columna DESC_RAMO del propio panel, no se inventó."
+dim_ramo,3,en_catalogo_oficial,BOOLEAN,true si el ramo está en el catálogo oficial vigente de la SHCP (catalogos.xlsx); false para históricos y códigos que solo existen en los datos.
