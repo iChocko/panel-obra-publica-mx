@@ -101,10 +101,28 @@ Ver [`reports/esquemas.md`](reports/esquemas.md) para el detalle columna por col
 muestras (2015, 2019, 2021), y [`reports/cobertura.md`](reports/cobertura.md) para la matriz
 completa año × trimestre.
 
-Esto sigue siendo descubrimiento -- **no hay pipeline de ingesta, normalización ni modelos
-todavía**, eso corresponde a Bronze (la Fase 1 formal del roadmap de arquitectura) en adelante.
+## Bronze — snapshots archivados (2026-08-08)
 
-## Cómo correr Fase 0
+**128 archivos únicos (215 MB), byte por byte tal como los sirvió la fuente**, hasheados y con
+procedencia completa en [`data/manifest.jsonl`](data/manifest.jsonl) -- 89 desde el servidor vivo
+de la SHCP, 53 solo recuperables vía Wayback Machine. Cubre 2015-2026 completo salvo los 7
+trimestres documentados como hueco real (2016 T1/T2/T4, 2017 T4, 2018 T1/T2/T4) -- **no
+inventados, no interpolados, simplemente no existen bajo ninguna fuente conocida** (ver la nota
+de transparencia metodológica arriba).
+
+**Regla dura del proyecto (ver `ARQUITECTURA-panel-obra-publica-mx.md` sección 4.1): bronze nunca
+se reescribe.** El nombre de cada archivo incluye los primeros 8 caracteres de su sha256
+(`opa_{año}_{trimestre}_{sha8}.{ext}`), así que es direccionable por contenido -- volver a correr
+la ingesta es idempotente por diseño, no por una bandera de "--skip-existentes".
+
+`data/bronze/` **no está en git** (demasiado pesado para el repo -- ver la sección "Almacenamiento
+de datos pesados" de la arquitectura, pendiente de subir a un bucket). `data/manifest.jsonl` **sí
+está versionado**: es pequeño, es la prueba de procedencia, y satisface el requisito de cita de
+los Términos de Libre Uso MX (liga + fecha de descarga). Cualquiera puede reproducir bronze
+completo corriendo `uv run opa bronze` -- vuelve a descargar los mismos bytes (mismo hash) de las
+mismas URLs que ya están documentadas en `reports/discovery.jsonl`.
+
+## Cómo correr Fase 0 + Bronze
 
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (gestionado automáticamente por `uv`).
 
@@ -124,6 +142,12 @@ uv run opa discover
 # Descarga 3 snapshots representativos (más antiguo, ~2019-2020, más reciente)
 # a data/muestras/ e inspecciona sus esquemas en reports/esquemas.md.
 uv run opa inspect
+
+# Bronze: descarga completa (no solo metadatos) de todo lo que discover encontró con
+# existe=True y extensión de datos real (csv/xlsx/json) -- ~164 candidatas, ≈10 min a 1
+# req/2s. Escribe data/bronze/ (crudo, fuera de git) y data/manifest.jsonl (procedencia,
+# versionado). Idempotente: correrlo de nuevo solo descarga lo que falte.
+uv run opa bronze
 ```
 
 Reportes producidos:
@@ -133,13 +157,16 @@ Reportes producidos:
 | `reports/discovery.jsonl` | Un renglón por URL/consulta probada, con resultado crudo |
 | `reports/cobertura.md` | Matriz año × trimestre (vivo / espejo / wayback / hueco) y recomendación |
 | `reports/esquemas.md` | Comparación de columnas y calidad entre las 3 muestras descargadas |
+| `data/manifest.jsonl` | Un renglón por snapshot bronze: url, origen, sha256, corte declarado, header_hash |
 
-## Alcance de esta sesión (Fase 0 + Fase 1: descubrimiento)
+## Alcance de esta sesión (Fase 0 + Fase 1 + Bronze)
 
-Solo reconocimiento: inventario de URLs (incluida la resolución del cambio de patrón 2022-2026),
-matriz de cobertura con números reales, e inspección de esquemas de muestra. **No hay pipeline de
-ingesta, normalización ni modelos todavía** — eso corresponde a Bronze y las fases siguientes,
-descritas en el documento de arquitectura.
+Reconocimiento completo (inventario de URLs, matriz de cobertura, inspección de esquemas) y la
+ingesta de Bronze: todos los snapshots recuperables descargados completos, hasheados y con
+procedencia documentada. **No hay normalización ni modelos todavía** (Silver/Gold) -- eso
+corresponde a las fases siguientes, descritas en el documento de arquitectura. El contrato
+Pandera de `cve_cartera` y el mapeo de esquemas entre 2015 y 2019/2021 siguen pendientes de
+Fase 2, con datos reales ya archivados para trabajar sobre ellos.
 
 ## Licencia
 

@@ -6,9 +6,11 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
-# Datos: todo lo pesado queda fuera de git salvo las muestras de Fase 0
+# Datos: todo lo pesado queda fuera de git. El manifiesto de Bronze sí se versiona -- es
+# pequeño, es la prueba de procedencia, y satisface la cita de los Términos de Libre Uso MX.
 data/*
 !data/muestras/
+!data/manifest.jsonl
 
 # Config local de Claude Code
 .claude/settings.local.json

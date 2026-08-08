@@ -15,7 +15,7 @@ import pandas as pd
 import typer
 from rich.console import Console
 
-from opa import discovery
+from opa import discovery, manifest
 
 app = typer.Typer(help="Fase 0 -- reconocimiento del panel histórico OPA.")
 console = Console()
@@ -26,9 +26,15 @@ RUTA_COBERTURA_MD = Path("reports/cobertura.md")
 RUTA_ESQUEMAS_MD = Path("reports/esquemas.md")
 DIR_MUESTRAS = Path("data/muestras")
 DIR_AUXILIARES = Path("data/auxiliares")
+DIR_BRONZE = Path("data/bronze")
+RUTA_MANIFEST_JSONL = Path("data/manifest.jsonl")
 
 TIMEOUT_DESCARGA_SEGUNDOS = 60.0
 BYTES_MUESTRA_SNIFF = 8192
+
+# Extensiones que Bronze archiva -- excluye assets del sitio (imágenes, JS) que la CDX de
+# Wayback también captura bajo los mismos prefijos de URL, sin ser datos de OPA.
+_EXTENSIONES_BRONZE = {"csv", "xlsx", "json"}
 
 
 @app.command()
@@ -47,6 +53,135 @@ def discover() -> None:
     console.print(f"\n[bold green]Descubrimiento completo.[/] {len(resultados)} registros escritos.")
     console.print(f"  Crudo:     {RUTA_DISCOVERY_JSONL}")
     console.print(f"  Cobertura: {RUTA_COBERTURA_MD}")
+
+
+# --------------------------------------------------------------------------
+# Bronze -- ingesta completa y manifiesto (Fase 1, ver ARQUITECTURA sección 4.1)
+# --------------------------------------------------------------------------
+
+
+def _candidatas_bronze(filas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Filtra discovery.jsonl a snapshots reales descargables -- existe=True, extensión de
+    datos (csv/xlsx/json), de una fuente descargable (vivo/wayback/espejo). Excluye consultas
+    de metadatos (CDX_QUERY, API sin recurso) y assets del sitio (imágenes, JS) que Wayback
+    captura bajo los mismos prefijos de URL sin ser datos de OPA."""
+    candidatas = []
+    for f in filas:
+        if not f.get("existe") or f.get("fuente") not in ("vivo", "wayback", "espejo"):
+            continue
+        url = str(f.get("url", ""))
+        nombre = url.rsplit("/", 1)[-1].split("?")[0]
+        ext = nombre.rsplit(".", 1)[-1].lower() if "." in nombre else ""
+        if ext not in _EXTENSIONES_BRONZE:
+            continue
+        candidatas.append(f)
+    return candidatas
+
+
+@app.command()
+def bronze() -> None:
+    """Descarga completa de todos los snapshots recuperables y escribe el manifiesto (Fase 1 -- Bronze).
+
+    Regla dura: bronze nunca se reescribe. El nombre de archivo es direccionable por contenido
+    (incluye los primeros 8 caracteres del sha256), así que re-correr esto es idempotente --
+    lo ya ingerido (por ``url`` + corte declarado) no se vuelve a descargar.
+    """
+    filas = _leer_discovery(RUTA_DISCOVERY_JSONL)
+    candidatas = _candidatas_bronze(filas)
+    console.print(
+        f"[bold]{len(candidatas)}[/] candidatas con contenido real de {len(filas)} renglones en discovery.jsonl."
+    )
+
+    cfg = discovery.cargar_config(RUTA_CONFIG)
+    manifiesto_previo = manifest.cargar_manifiesto(RUTA_MANIFEST_JSONL)
+    ya_ingeridas = manifest.claves_ya_ingeridas(manifiesto_previo)
+
+    DIR_BRONZE.mkdir(parents=True, exist_ok=True)
+    RUTA_MANIFEST_JSONL.parent.mkdir(parents=True, exist_ok=True)
+
+    limitador = discovery.LimitadorTasa(cfg["red"]["rate_limit_segundos_shcp"])
+    user_agent = cfg["red"]["user_agent"]
+    timeout = cfg["red"]["timeout_segundos"]
+
+    descargados = saltados = fallidos = 0
+    total_bytes = 0
+    cache_por_url: dict[str, tuple[int, bytes]] = {}
+
+    with (
+        httpx.Client(headers={"User-Agent": user_agent}, follow_redirects=True) as cliente,
+        RUTA_MANIFEST_JSONL.open("a", encoding="utf-8") as f_manifest,
+    ):
+        for i, fila in enumerate(candidatas, start=1):
+            anio, trimestre = fila.get("anio"), fila.get("trimestre")
+            url = str(fila["url"])
+            clave = (url, anio, trimestre)
+            if clave in ya_ingeridas:
+                saltados += 1
+                continue
+
+            url_descarga = _url_para_descarga(fila)
+            if url_descarga not in cache_por_url:
+                limitador.esperar()
+                try:
+                    cache_por_url[url_descarga] = _get_completo_con_fallback(cliente, url_descarga, user_agent, timeout)
+                except (httpx.HTTPError, RuntimeError) as exc:
+                    console.log(f"[red]Fallo descargando {url_descarga}: {exc}[/]")
+                    fallidos += 1
+                    continue
+            status, contenido = cache_por_url[url_descarga]
+            if not contenido:
+                console.log(f"[yellow]Cuerpo vacío: {url_descarga}[/]")
+                fallidos += 1
+                continue
+
+            try:
+                sha256 = manifest.calcular_sha256(contenido)
+                ext = url.rsplit("/", 1)[-1].split("?")[0].rsplit(".", 1)[-1].lower()
+                slug = manifest.slug_desde_url(url) if anio is None else None
+                nombre_bronze = manifest.nombre_archivo_bronze(anio, trimestre, sha256, ext, slug)
+                ruta_bronze = DIR_BRONZE / nombre_bronze
+                if not ruta_bronze.exists():
+                    ruta_bronze.write_bytes(contenido)
+
+                columnas, encoding = manifest.inspeccionar_columnas(contenido, ext)
+                registro = manifest.RegistroManifiesto(
+                    snapshot_id=manifest.construir_snapshot_id(anio, trimestre, sha256, slug),
+                    url=url,
+                    origen=fila["fuente"],
+                    fecha_descarga=datetime.now(UTC).date().isoformat(),
+                    http_status=status,
+                    sha256=sha256,
+                    bytes=len(contenido),
+                    corte_declarado={"anio": anio, "trimestre": trimestre},
+                    archivo_bronze=nombre_bronze,
+                    header_hash=manifest.calcular_header_hash(columnas),
+                    n_columnas=len(columnas) if columnas else None,
+                    encoding_detectado=encoding,
+                    wayback_timestamp=fila.get("wayback_timestamp") if fila["fuente"] == "wayback" else None,
+                )
+            except Exception as exc:  # un archivo raro (encabezado no estándar, etc.) no debe tumbar el lote
+                console.log(f"[red]Fallo procesando {url} (contenido ya descargado, no se pierde): {exc}[/]")
+                fallidos += 1
+                continue
+
+            f_manifest.write(registro.to_json_line() + "\n")
+            f_manifest.flush()
+            descargados += 1
+            total_bytes += len(contenido)
+            ya_ingeridas.add(clave)
+
+            if i % 20 == 0 or i == len(candidatas):
+                console.print(
+                    f"  ... {i}/{len(candidatas)} procesadas "
+                    f"({descargados} nuevas, {saltados} ya ingeridas, {fallidos} fallidas)"
+                )
+
+    console.print(
+        f"\n[bold green]Bronze completo.[/] {descargados} snapshots nuevos "
+        f"({total_bytes / 1_048_576:.1f} MB), {saltados} ya ingeridos, {fallidos} fallidos."
+    )
+    console.print(f"  Bronze:     {DIR_BRONZE}/")
+    console.print(f"  Manifiesto: {RUTA_MANIFEST_JSONL}")
 
 
 # --------------------------------------------------------------------------
@@ -103,27 +238,31 @@ def _url_para_descarga(fila: dict[str, Any]) -> str:
     return fila["url"]
 
 
-def descargar_muestra(
-    cliente: httpx.Client, etiqueta: str, fila: dict[str, Any], destino_dir: Path, user_agent: str
-) -> Path:
-    """Descarga una muestra completa (excepción explícita a "solo metadatos" de discovery).
-
-    Cae a curl si httpx no puede armar la cadena de certificados -- ver la nota en
-    ``discovery.es_error_cadena_tls`` (caso real y confirmado en dominios .gob.mx).
-    """
-    url_descarga = _url_para_descarga(fila)
+def _get_completo_con_fallback(
+    cliente: httpx.Client, url: str, user_agent: str, timeout: float
+) -> tuple[int, bytes]:
+    """GET completo; cae a curl si httpx no puede armar la cadena de certificados -- ver la
+    nota en ``discovery.es_error_cadena_tls`` (caso real y confirmado en dominios .gob.mx)."""
     try:
-        resp = cliente.get(url_descarga, timeout=TIMEOUT_DESCARGA_SEGUNDOS)
+        resp = cliente.get(url, timeout=timeout)
         resp.raise_for_status()
-        contenido = resp.content
+        return resp.status_code, resp.content
     except httpx.HTTPError as exc:
         error = f"{type(exc).__name__}: {exc}"
         if not discovery.es_error_cadena_tls(error):
             raise
-        status, _headers, cuerpo = discovery.curl_get(url_descarga, user_agent, TIMEOUT_DESCARGA_SEGUNDOS)
-        if status != 200:
-            raise RuntimeError(f"No se pudo descargar {url_descarga} (tampoco vía curl): {error}") from exc
-        contenido = cuerpo
+        status, _headers, cuerpo = discovery.curl_get(url, user_agent, timeout)
+        if status is None or status >= 400:
+            raise RuntimeError(f"No se pudo descargar {url} (tampoco vía curl): {error}") from exc
+        return status, cuerpo
+
+
+def descargar_muestra(
+    cliente: httpx.Client, etiqueta: str, fila: dict[str, Any], destino_dir: Path, user_agent: str
+) -> Path:
+    """Descarga una muestra completa (excepción explícita a "solo metadatos" de discovery)."""
+    url_descarga = _url_para_descarga(fila)
+    _status, contenido = _get_completo_con_fallback(cliente, url_descarga, user_agent, TIMEOUT_DESCARGA_SEGUNDOS)
 
     destino_dir.mkdir(parents=True, exist_ok=True)
     ext = fila["url"].rsplit(".", 1)[-1].split("?")[0].lower()
