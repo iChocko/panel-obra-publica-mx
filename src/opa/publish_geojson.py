@@ -115,9 +115,25 @@ def _feature(fila: pd.Series) -> dict[str, Any]:
     }
 
 
+NOMBRE_CONSOLIDADO = "ppi_consolidado.geojson"
+
+
+def _escribir_coleccion(ruta: Path, filas: pd.DataFrame) -> None:
+    coleccion = {
+        "type": "FeatureCollection",
+        "features": [_feature(fila) for _, fila in filas.iterrows()],
+    }
+    with ruta.open("w", encoding="utf-8") as fh:
+        json.dump(coleccion, fh, ensure_ascii=False, allow_nan=False)
+
+
 def escribir_geojson(ruta_duckdb: Path, dir_salida: Path, version: str) -> list[Path]:
-    """Exporta fct_ppi_observacion (enriquecido con dim_ppi) a GeoJSON, un FeatureCollection
-    por año de corte. Ver el docstring del módulo para el criterio del join histórico."""
+    """Exporta fct_ppi_observacion (enriquecido con dim_ppi) a GeoJSON: un FeatureCollection
+    por año de corte MÁS uno consolidado (todas las observaciones georreferenciadas juntas,
+    mismo grano e igual orden que la unión de los archivos por año -- ver
+    ``ppi_consolidado.geojson``, útil para quien quiere cargar el panel completo en un solo
+    archivo, ej. en QGIS/Leaflet, sin unir 13 archivos a mano). Ver el docstring del módulo
+    para el criterio del join histórico."""
     df = _leer_observaciones_georreferenciadas(ruta_duckdb)
 
     dir_geojson = dir_salida / version / "geojson"
@@ -132,13 +148,12 @@ def escribir_geojson(ruta_duckdb: Path, dir_salida: Path, version: str) -> list[
     for grupo in sorted(df["_grupo"].unique()):
         sub = df[df["_grupo"] == grupo]
         nombre_archivo = "ppi_sin_anio.geojson" if grupo == "sin_anio" else f"ppi_{grupo}.geojson"
-        coleccion = {
-            "type": "FeatureCollection",
-            "features": [_feature(fila) for _, fila in sub.iterrows()],
-        }
         ruta = dir_geojson / nombre_archivo
-        with ruta.open("w", encoding="utf-8") as fh:
-            json.dump(coleccion, fh, ensure_ascii=False, allow_nan=False)
+        _escribir_coleccion(ruta, sub)
         escritas.append(ruta)
+
+    ruta_consolidado = dir_geojson / NOMBRE_CONSOLIDADO
+    _escribir_coleccion(ruta_consolidado, df)
+    escritas.append(ruta_consolidado)
 
     return escritas

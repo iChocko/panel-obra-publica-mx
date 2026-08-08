@@ -92,6 +92,13 @@ contra el duckdb real antes de commitear.
    rango y se siguen publicando sin enriquecer, en vez de desaparecer del mapa). Corrida real:
    96.4% de los puntos de 2021 trajeron `nombre_ppi` (el resto son casos legítimos sin versión
    vigente de `dim_ppi` en ese corte, no un bug del join).
+   **`ppi_consolidado.geojson` agregado (2026-08-08, a petición explícita):** además de los
+   archivos por año, `escribir_geojson` ahora también escribe un `FeatureCollection` con la
+   unión de todas las observaciones georreferenciadas (~94,198 features, 69 MB) -- mismo
+   grano y mismo orden que la suma de los archivos por año, verificado por test. Útil para
+   cargar el panel completo en un SIG sin unir 14 archivos a mano. `publish_dcat.py` lo
+   recoge automáticamente como una `dcat:Distribution` más de `fct_ppi_observacion` (escanea
+   todo `geojson/*.geojson`, no una lista fija) -- no requirió cambios.
 3. ✅ `src/opa/publish_manifest.py`: `checksums.sha256` formato `sha256sum` estándar
    (verificable con `shasum -a 256 -c`). La revisión adversarial encontró un bug real: las
    líneas se ordenaban por el STRING COMPLETO `"{hash}  {ruta}"`, es decir por hash primero

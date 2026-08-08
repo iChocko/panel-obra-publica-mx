@@ -138,7 +138,9 @@ produce siempre los mismos bytes, verificado corriendo dos veces y comparando.
 
 - **CSV** (RFC 4180) — el formato base que exigen los Lineamientos de datos abiertos.
 - **Parquet** — mismo contenido con tipos preservados, para análisis sin re-parseo.
-- **GeoJSON** (RFC 7946) — un `FeatureCollection` por año, listo para QGIS/Leaflet sin ETL previo.
+- **GeoJSON** (RFC 7946) — un `FeatureCollection` por año más uno **consolidado**
+  (`ppi_consolidado.geojson`, la unión de todos los años en un solo archivo, ~94 mil
+  observaciones), listo para QGIS/Leaflet sin ETL previo.
 - **`catalog.json`** — catálogo DCAT (JSON-LD) con metadatos, procedencia y calidad reales.
 - **`NOTA-TECNICA.md`** — limitaciones conocidas, viajando *con* los datos, no solo en el repo.
 - **`checksums.sha256`** — integridad de todo lo anterior, incluidos el catálogo y la nota.

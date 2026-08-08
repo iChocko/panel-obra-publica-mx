@@ -109,7 +109,12 @@ def test_escribe_un_archivo_por_anio_y_excluye_filas_sin_coordenadas(tmp_path: P
     escritas = publish_geojson.escribir_geojson(db, tmp_path / "salida", "v1")
 
     nombres = {p.name for p in escritas}
-    assert nombres == {"ppi_2020.geojson", "ppi_2021.geojson", "ppi_sin_anio.geojson"}
+    assert nombres == {
+        "ppi_2020.geojson",
+        "ppi_2021.geojson",
+        "ppi_sin_anio.geojson",
+        "ppi_consolidado.geojson",
+    }
     for ruta in escritas:
         assert ruta.parent == tmp_path / "salida" / "v1" / "geojson"
     # OPA004 (sin coordenadas) no debe aparecer en ningún archivo.
@@ -309,3 +314,67 @@ def test_snapshot_anual_sin_trimestre_no_enriquece_pero_se_publica(tmp_path: Pat
 
     assert feature["properties"]["cve_cartera"] == "OPA006"
     assert feature["properties"]["nombre_ppi"] is None
+
+
+def test_consolidado_contiene_la_union_de_todos_los_anios(tmp_path: Path) -> None:
+    db = tmp_path / "gold.duckdb"
+    _crear_duckdb(db)
+
+    escritas = publish_geojson.escribir_geojson(db, tmp_path / "salida", "v1")
+    dir_geojson = tmp_path / "salida" / "v1" / "geojson"
+
+    total_por_anio = 0
+    for ruta in escritas:
+        if ruta.name in ("ppi_consolidado.geojson",):
+            continue
+        with ruta.open(encoding="utf-8") as fh:
+            total_por_anio += len(json.load(fh)["features"])
+
+    with (dir_geojson / "ppi_consolidado.geojson").open(encoding="utf-8") as fh:
+        consolidado = json.load(fh)
+
+    assert consolidado["type"] == "FeatureCollection"
+    assert len(consolidado["features"]) == total_por_anio
+    cve_carteras_consolidado = {f["properties"]["cve_cartera"] for f in consolidado["features"]}
+    assert cve_carteras_consolidado == {"OPA001", "OPA002", "OPA003", "OPA005"}
+    # OPA004 (sin coordenadas) tampoco debe colarse en el consolidado.
+    assert "OPA004" not in cve_carteras_consolidado
+
+
+def test_consolidado_no_se_escribe_si_no_hay_ninguna_fila_valida(tmp_path: Path) -> None:
+    db = tmp_path / "gold.duckdb"
+    con = duckdb.connect(str(db))
+    con.execute(
+        """
+        create table fct_ppi_observacion (
+            cve_cartera varchar, snapshot_id varchar, anio_corte double, trimestre_corte integer,
+            latitud double, longitud double, descripcion_ramo varchar, descripcion_tipo_ppi varchar,
+            entidad_federativa varchar, fase varchar, avance_fisico double, estatus_operacion varchar,
+            aprobado double, ppef double, pef double, modificado double, ejercido double,
+            monto_total_inversion double
+        )
+        """
+    )
+    con.execute("create table dim_snapshot (snapshot_id varchar, anio integer, trimestre integer)")
+    con.execute(
+        """
+        create table dim_ppi (
+            cve_cartera varchar, version_ppi integer, vigente_desde_corte integer,
+            vigente_hasta_corte integer, nombre_ppi varchar, descripcion_ur varchar,
+            localizacion varchar
+        )
+        """
+    )
+    con.execute("insert into dim_snapshot values ('2019_anual', 2019, NULL)")
+    con.execute(
+        """
+        insert into fct_ppi_observacion values
+        ('OPA001', '2019_anual', 2019.0, NULL, NULL, NULL, 'Salud', 'Hospitalario',
+         'Campeche', NULL, 10.0, 'En ejecución', 100000.0, 100000.0, 100000.0,
+         100000.0, 50000.0, 300000.0)
+        """
+    )
+    con.close()
+
+    escritas = publish_geojson.escribir_geojson(db, tmp_path / "salida", "v1")
+    assert escritas == []
