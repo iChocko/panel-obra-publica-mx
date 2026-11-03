@@ -1,14 +1,103 @@
-# Panel Histórico de Obra Pública Federal (México)
+<p align="center">
+  <img src="docs/img/hero.png" alt="Federal Public Investment Panel — 11,025 projects, 173,316 project-quarter records, 2015–2026" width="100%">
+</p>
 
-Serie histórica trimestral 2015–2026 del padrón de **Programas y Proyectos de Inversión (PPI)**
-del gobierno federal mexicano, reconstruida a partir de *Obra Pública Abierta* (OPA) de la SHCP.
+<p align="center">
+  <a href="https://github.com/iChocko/panel-obra-publica-mx/actions/workflows/ci.yml"><img src="https://github.com/iChocko/panel-obra-publica-mx/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/iChocko/panel-obra-publica-mx/releases/tag/datos-2026T1"><img src="https://img.shields.io/badge/data%20release-2026T1-F5A524?style=flat" alt="Data release 2026T1"></a>
+  <img src="https://img.shields.io/badge/formats-CSV%20%C2%B7%20Parquet%20%C2%B7%20GeoJSON-1B3A63?style=flat" alt="Formats">
+  <img src="https://img.shields.io/badge/stack-Python%20%C2%B7%20dbt%20%C2%B7%20DuckDB-14B8A6?style=flat" alt="Stack">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/code-MIT-64748B?style=flat" alt="MIT license"></a>
+</p>
 
-**[⬇ Descargar los datos — release `datos-2026T1`](https://github.com/iChocko/panel-obra-publica-mx/releases/tag/datos-2026T1)**
-· CSV + Parquet + GeoJSON · catálogo DCAT · nota técnica · checksums verificables
+<p align="center">
+  <b><a href="https://github.com/iChocko/panel-obra-publica-mx/releases/tag/datos-2026T1">⬇ Download the data</a></b>
+  &nbsp;·&nbsp; <a href="#key-results">Key results</a>
+  &nbsp;·&nbsp; <a href="#how-it-works">How it works</a>
+  &nbsp;·&nbsp; <a href="#documentación-técnica-en-español">Documentación en español</a>
+</p>
+
+## The problem in one line
+
+Mexico's Finance Ministry (SHCP) publishes a quarterly snapshot of every federal investment project — budget,
+location, physical progress — but **each new snapshot overwrites the previous one**. You can see where a project
+stands today, never how it got there.
+
+This repository recovers eleven years of those snapshots (live server, Wayback Machine, the portal's own
+manifests) and rebuilds them into a **longitudinal panel: one row per project per quarter**, with the full
+history of every change. That makes questions answerable for the first time: cost overruns against the original
+budget, delays, projects that vanish mid-execution, and where federal investment actually lands.
+
+| | |
+|---|---|
+| **11,025** | federal investment projects tracked |
+| **173,316** | project × quarter records |
+| **29 / 36** | quarters recovered for 2016–2024, gaps documented, never interpolated |
+| **98.9%** | of 179,179 raw rows pass the data contract; the rest is quarantined with its reason |
+| **40 / 40** | dbt tests passing, plus a pytest suite running in CI |
+
+## Key results
+
+<p align="center"><img src="docs/img/map.png" alt="Map of geolocated federal investment projects in Mexico" width="100%"></p>
+
+<p align="center"><img src="docs/img/sectors.png" alt="Modified budget by sector" width="100%"></p>
+
+<p align="center"><img src="docs/img/coverage.png" alt="Quarterly coverage of the panel, 2016–2026" width="100%"></p>
+
+<p align="center"><img src="docs/img/seasonality.png" alt="Projects per quarterly snapshot with Q1 drops" width="100%"></p>
+
+<p align="center"><img src="docs/img/lifecycle.png" alt="Inferred end state of the projects" width="100%"></p>
+
+<p align="center"><img src="docs/img/cost_change.png" alt="Final vs initial investment amount" width="100%"></p>
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["SHCP live server<br/>Wayback Machine<br/>portal manifest"] -->|discover| B["Bronze<br/>raw files, content-addressed<br/>(SHA-256)"]
+    B -->|normalize + data contract| C["Silver<br/>11 source schemas → 1<br/>Parquet per snapshot"]
+    C -->|dbt| D["Gold · DuckDB<br/>fact + SCD2 dimensions<br/>deltas, lifecycle"]
+    D -->|publish| E["Release<br/>CSV · Parquet · GeoJSON<br/>DCAT catalog · checksums"]
+```
+
+- **Bronze** archives every file exactly as served and never rewrites it; re-running is idempotent by design.
+- **Silver** maps 11 different source schemas (including two bugs in the source itself) to one canonical model,
+  validated row by row with Pandera. Nothing is dropped silently.
+- **Gold** is a dimensional model in dbt + DuckDB: `fct_ppi_observacion`, `dim_ppi` (SCD2), `fct_ppi_delta`,
+  `fct_ppi_ciclo_vida`.
+- **Publish** packages the panel deterministically (same input, same bytes) in open formats with a DCAT
+  catalog and a technical note that travels with the data.
+
+Design rule across all layers: **fail loudly**. A broken build beats a silently incomplete dataset.
+
+## Use the data in two minutes
+
+Download `panel_opa_2026T1.zip` from the [release](https://github.com/iChocko/panel-obra-publica-mx/releases/tag/datos-2026T1), unzip it, and query the Parquet files directly:
+
+```python
+import duckdb
+
+duckdb.sql("""
+    select estatus_terminal_inferido, count(*) as projects,
+           round(median(sobrecosto_pct), 1) as median_cost_change_pct
+    from 'tabular/fct_ppi_ciclo_vida.parquet'
+    group by 1 order by 2 desc
+""").show()
+```
+
+GeoJSON layers (`geojson/ppi_consolidado.geojson`) open directly in QGIS, Kepler.gl or Leaflet.
+
+**Built with** Python 3.12 · uv · httpx · pandas · pyarrow · Pandera · dbt · DuckDB · Typer · pytest · ruff ·
+GitHub Actions. README figures are generated by [`scripts/readme_figures/render.py`](scripts/readme_figures/render.py)
+from the published release.
 
 ---
 
-## El problema
+## Documentación técnica (en español)
+
+Toda la documentación de diseño, hallazgos y limitaciones del proyecto.
+
+### El problema
 
 La Secretaría de Hacienda publica cada trimestre una fotografía del universo de proyectos de
 inversión federal en su portal de Obra Pública Abierta: qué se está construyendo, dónde, con
@@ -29,7 +118,7 @@ historia conforme avanza.
 Este repositorio reconstruye esa historia y la publica como un panel longitudinal por clave de
 cartera, que hoy no existe en ningún otro lugar público.
 
-## Cómo se resolvió
+### Cómo se resolvió
 
 La reconstrucción se apoya en tres fuentes en cascada, porque ninguna sola alcanza:
 
@@ -43,39 +132,34 @@ El resultado: **29 de 36 trimestres del periodo 2016–2024 son recuperables (80
 2015 y de todo 2025–2026. Los 7 trimestres restantes se agotaron por cuatro vías independientes y
 quedan documentados como huecos reales, no interpolados.
 
-![Cobertura del panel por corte trimestral](reports/figuras/cobertura_cortes.png)
-
-Azul es dato real; rojo es un corte que la fuente declara pero llega corrupto; gris es un hueco
-real sin ninguna fuente conocida. El asterisco marca cobertura parcial (no es el universo
-Consolidado completo). Galería completa con interpretación de cada figura:
+Las figuras de cobertura, mapa, estacionalidad y ciclo de vida están arriba, en
+[*Key results*](#key-results). Galería técnica con interpretación de cada figura:
 [`reports/figuras/GALERIA.md`](reports/figuras/GALERIA.md).
 
-## Qué hay en el panel
+### Qué hay en el panel
 
-Números reales del build actual (`data/gold/panel_opa.duckdb`):
+Números reales del paquete publicado (`datos-2026T1`):
 
 | | |
 |---|---|
 | **11,025** | proyectos de inversión únicos (`cve_cartera`) |
 | **173,316** | observaciones proyecto × corte trimestral |
 | **34** | cortes trimestrales canónicos, 2015–2026 |
-| **6,702** | proyectos con coordenadas geográficas válidas |
-| **16,560** | versiones históricas de atributos (SCD2: cambios de nombre, ramo, ubicación) |
+| **6,013** | proyectos del panel con coordenadas geográficas válidas |
+| **16,566** | versiones históricas de atributos (SCD2: cambios de nombre, ramo, ubicación) |
 
 Con eso se puede responder, por primera vez de forma directa: sobrecosto por proyecto (monto
 inicial vs. final), duración observada vs. planeada, trayectoria de avance físico, cambios de
 estatus, proyectos que desaparecen del padrón sin explicación, y la distribución geográfica de la
 inversión federal a lo largo de once años.
 
-![Distribución geográfica de los proyectos de inversión](reports/figuras/mapa_ppi.png)
-
-## Arquitectura: cuatro capas
+### Arquitectura: cuatro capas
 
 El pipeline sigue el patrón **medallón** (Bronze → Silver → Gold), más una capa de publicación.
 La idea central es que cada capa tiene una responsabilidad y **ninguna puede corregir en silencio
 lo que hizo la anterior**: si algo no cuadra, el proceso se detiene y lo reporta.
 
-### Bronze — archivar sin tocar
+#### Bronze — archivar sin tocar
 
 Descarga los archivos tal como los sirve la fuente y **nunca los reescribe**. Cada archivo se
 guarda con los primeros 8 caracteres de su SHA-256 en el nombre
@@ -91,7 +175,7 @@ descarga, corte declarado— y **sí está versionado en git**: es la prueba de 
 satisface el requisito de cita de los Términos de Libre Uso MX. Los archivos crudos no están en
 git por peso, pero cualquiera puede regenerarlos byte por byte con `opa bronze`.
 
-### Silver — normalizar sin adivinar
+#### Silver — normalizar sin adivinar
 
 Aquí vive el trabajo sucio. Inspeccionar los 128 archivos reales (no una muestra) reveló **11
 esquemas distintos**, no los 2 que se esperaban:
@@ -114,7 +198,7 @@ cuarentena con el motivo exacto documentado por archivo, no descartado en silenc
 
 Salida: un Parquet por snapshot en `data/silver/` (78 MB).
 
-### Gold — el modelo dimensional
+#### Gold — el modelo dimensional
 
 `dbt` transforma los Parquet en el panel consultable, materializado en **DuckDB**:
 
@@ -131,7 +215,7 @@ Salida: un Parquet por snapshot en `data/silver/` (78 MB).
 reales (unicidad del grano, avance físico decreciente con bandera, estabilidad de conteo por
 ramo).
 
-### Publicación — el paquete distribuible
+#### Publicación — el paquete distribuible
 
 `opa publish` empaqueta el panel en formatos abiertos, de forma **determinista**: el mismo DuckDB
 produce siempre los mismos bytes, verificado corriendo dos veces y comparando.
@@ -145,7 +229,7 @@ produce siempre los mismos bytes, verificado corriendo dos veces y comparando.
 - **`NOTA-TECNICA.md`** — limitaciones conocidas, viajando *con* los datos, no solo en el repo.
 - **`checksums.sha256`** — integridad de todo lo anterior, incluidos el catálogo y la nota.
 
-## El stack, y por qué
+### El stack, y por qué
 
 | Herramienta | Para qué | Por qué esa |
 |---|---|---|
@@ -161,7 +245,7 @@ Decisión de diseño transversal: **fallar ruidoso**. Si aparece un esquema no m
 sin documentar o un insumo faltante, el proceso sale con código 1 en vez de continuar con datos
 parciales. Vale más un build roto que un dataset silenciosamente incompleto.
 
-## Hallazgos reales
+### Hallazgos reales
 
 Lo que se aprendió reconstruyendo esto — y que no estaba en ninguna documentación:
 
@@ -213,8 +297,6 @@ reorganización administrativa real (IMSS-BIENESTAR obtuvo ramo presupuestal pro
 uno era probable depuración de estudios de preinversión estancados. El test se ajustó para
 excluir la transición Q4→Q1 y sigue activo para el resto.
 
-![Universo de PPI por corte trimestral, con el patrón estacional Q4→Q1 marcado](reports/figuras/universo_por_corte.png)
-
 **No todo proyecto que desaparece del padrón terminó.** De los 11,025 proyectos del panel, 6,785
 quedan clasificados como "salida no explicada": nunca llegaron a 95% de avance y dejaron de
 aparecer antes del corte más reciente. Eso puede ser una cancelación real, o un proyecto que cayó
@@ -222,15 +304,13 @@ justo en uno de los 7 trimestres-hueco del panel — los datos abiertos, tal com
 SHCP, no permiten distinguir ambos casos. Es una limitación declarada, no una cifra que se
 presente como certeza.
 
-![Estatus terminal inferido de los 11,025 proyectos del panel](reports/figuras/estatus_terminal.png)
-
 **Nota de entorno:** tanto `transparenciapresupuestaria.gob.mx` como `datos.gob.mx` sirven una
 cadena de certificados TLS incompleta (rotaron su intermedio de Let's Encrypt pero el servidor no
 lo envía). `httpx`/OpenSSL no hacen *AIA chasing* y fallan con `CERTIFICATE_VERIFY_FAILED`;
 `curl` sí resuelve la cadena vía el almacén del sistema. `discovery.py` tiene un fallback a `curl`
 para este caso exacto — **sin desactivar la verificación TLS**.
 
-## Limitaciones conocidas
+### Limitaciones conocidas
 
 Declaradas a propósito, y empaquetadas junto con los datos en `NOTA-TECNICA.md`:
 
@@ -253,7 +333,7 @@ Declaradas a propósito, y empaquetadas junto con los datos en `NOTA-TECNICA.md`
   tests fijan el conjunto conocido hoy para detectar valores *nuevos*, no para certificar que
   estén limpios.
 
-## Alineación a los Lineamientos de Datos Abiertos (ATDT)
+### Alineación a los Lineamientos de Datos Abiertos (ATDT)
 
 El 11/09/2025 la Agencia de Transformación Digital y Telecomunicaciones publicó en el DOF los
 [Lineamientos en materia de Datos Abiertos de la APF](docs/normativa/2025-09-11_ATDT_Lineamientos-Datos-Abiertos-APF.md)
@@ -278,7 +358,7 @@ Dos notas relevantes, verificadas en vivo el 2026-08-08:
   inventado; los resúmenes propios de este repo viajan bajo claves con prefijo `x-` explícito,
   claramente separados del vocabulario oficial.
 
-## Cómo correr el pipeline
+### Cómo correr el pipeline
 
 Requiere [`uv`](https://docs.astral.sh/uv/) y Python 3.12 (que `uv` gestiona solo).
 
@@ -316,7 +396,7 @@ Los pasos 1–3 son opcionales si solo se quiere el panel: el
 [release publicado](https://github.com/iChocko/panel-obra-publica-mx/releases/tag/datos-2026T1)
 ya trae el resultado final.
 
-## Estructura del repositorio
+### Estructura del repositorio
 
 ```
 conf/           Configuración declarativa: patrones de URL, mapeo de esquemas,
@@ -337,7 +417,7 @@ Documentos de diseño: [`viabilidad_tecnica`](viabilidad_tecnica) (dictamen inic
 completa). El README documenta lo que *se construyó*; esos documentos, lo que *se planeó* — las
 diferencias entre ambos están anotadas arriba, en Hallazgos.
 
-## Licencia
+### Licencia
 
 El **código** está bajo licencia [MIT](LICENSE).
 
@@ -347,7 +427,7 @@ Datos Abiertos" (DOF 20/02/2015). Toda redistribución debe citar: nombre del co
 siglas de la dependencia (SHCP), liga de los datos descargados y fecha de consulta en formato
 `AAAA-MM-DD`.
 
-## Cómo citar
+### Cómo citar
 
 > Panel Histórico de Obra Pública Federal (México), reconstruido de Obra Pública Abierta (OPA),
 > Secretaría de Hacienda y Crédito Público (SHCP).
