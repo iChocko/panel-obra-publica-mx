@@ -144,7 +144,7 @@ Números reales del paquete publicado (`datos-2026T1`):
 |---|---|
 | **11,025** | proyectos de inversión únicos (`cve_cartera`) |
 | **173,316** | observaciones proyecto × corte trimestral |
-| **34** | cortes trimestrales canónicos, 2015–2026 |
+| **33** | cortes trimestrales con datos, 2016–2026 (34 canónicos; 2024 T1 llega corrupto en la fuente y no aporta filas) |
 | **6,013** | proyectos del panel con coordenadas geográficas válidas |
 | **16,566** | versiones históricas de atributos (SCD2: cambios de nombre, ramo, ubicación) |
 
